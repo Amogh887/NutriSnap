@@ -25,7 +25,7 @@ body {
 
 .app-container {
   width: 100%;
-  max-width: 600px; /* Mobile-first width, but looks good on desktop */
+  max-width: 800px;
   padding: 2rem;
   box-sizing: border-box;
   display: flex;
@@ -79,7 +79,6 @@ body {
   justify-content: center;
 }
 
-/* Hide original input, style the label as a button */
 input[type="file"] {
   display: none;
 }
@@ -125,7 +124,7 @@ input[type="file"] {
   padding: 1rem 2rem;
   font-size: 1.1rem;
   font-weight: bold;
-  border-radius: 30px; /* Pill shape */
+  border-radius: 30px;
   cursor: pointer;
   width: 100%;
   transition: background-color var(--transition-speed), transform 0.1s;
@@ -149,55 +148,293 @@ input[type="file"] {
   font-size: 0.9rem;
 }
 
-.status-message.loading {
-  color: #2196F3;
-  animation: pulse 1.5s infinite;
-}
-
 .status-message.error {
   color: #F44336;
+  background: rgba(244, 67, 54, 0.1);
+  padding: 1rem;
+  border-radius: var(--border-radius);
+  border: 1px solid rgba(244, 67, 54, 0.2);
 }
 
+/* Pipeline styles */
+.pipeline-container {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.pipeline-step {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.8rem 1rem;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 8px;
+  color: var(--text-muted);
+  transition: all 0.3s ease;
+  opacity: 0.5;
+}
+
+.pipeline-step.active {
+  background: rgba(76, 175, 80, 0.1);
+  color: var(--text-light);
+  opacity: 1;
+  border: 1px solid rgba(76, 175, 80, 0.2);
+}
+
+.step-icon {
+  font-size: 1.2rem;
+}
+
+.loading-spinner-small {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-top-color: var(--primary-color);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-left: auto;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Updated Results Section for Gemini API JSON output */
+
 .result-section {
-  margin-top: 2rem;
+  margin-top: 2.5rem;
   width: 100%;
 }
 
 .result-section h2 {
   color: var(--primary-color);
-  font-size: 1.5rem;
-  margin-bottom: 1rem;
+  font-size: 1.8rem;
+  margin-bottom: 1.5rem;
+  text-align: center;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   padding-bottom: 0.5rem;
 }
 
-.result-card {
+/* Detected Ingredients Card */
+.ingredients-card {
   background-color: var(--card-bg);
-  border-radius: var(--border-radius);
   padding: 1.5rem;
+  border-radius: var(--border-radius);
+  margin-bottom: 2rem;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
   border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
-.result-card p {
-  margin: 0.5rem 0;
+.ingredients-card h3 {
+  margin-top: 0;
+  color: var(--text-light);
+  font-size: 1.2rem;
+  margin-bottom: 1rem;
+}
+
+.tags-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.tag {
+  padding: 0.4rem 0.8rem;
+  border-radius: 20px;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.ingredient-tag {
+  background-color: rgba(76, 175, 80, 0.15);
+  color: #a5d6a7;
+  border: 1px solid rgba(76, 175, 80, 0.3);
+}
+
+.diet-tag {
+  background-color: rgba(33, 150, 243, 0.15);
+  color: #90caf9;
+  border: 1px solid rgba(33, 150, 243, 0.3);
+}
+
+/* Recipes List Container */
+.recipes-container {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.recipes-container h3 {
+  color: var(--text-light);
+  font-size: 1.4rem;
+  margin-bottom: 0.5rem;
+}
+
+/* Recipe Item Card */
+.recipe-card {
+  background-color: var(--card-bg);
+  border-radius: var(--border-radius);
+  padding: 2rem;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  transition: transform 0.2s ease;
+}
+
+.recipe-card:hover {
+  transform: translateY(-4px);
+  border-color: rgba(76, 175, 80, 0.3);
+}
+
+.recipe-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding-bottom: 1rem;
+  margin-bottom: 1rem;
+}
+
+.recipe-header h4 {
+  margin: 0;
+  font-size: 1.5rem;
+  color: var(--primary-color);
+}
+
+.health-score-badge {
+  background: linear-gradient(135deg, #4CAF50, #2E7D32);
+  color: white;
+  padding: 0.4rem 1rem;
+  border-radius: 20px;
+  font-weight: bold;
+  font-size: 1rem;
+  box-shadow: 0 2px 8px rgba(76, 175, 80, 0.4);
+}
+
+.recipe-description {
+  font-size: 1.05rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+  margin-bottom: 1.5rem;
+}
+
+.recipe-meta {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.recipe-body {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+  margin-bottom: 1.5rem;
+  background-color: rgba(0,0,0,0.2);
+  padding: 1.5rem;
+  border-radius: 8px;
+}
+
+.recipe-ingredients h5,
+.recipe-nutrition h5,
+.recipe-instructions h5 {
+  color: var(--text-light);
+  font-size: 1.1rem;
+  margin-top: 0;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  padding-bottom: 0.5rem;
+}
+
+.recipe-ingredients ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.recipe-ingredients li {
+  margin-bottom: 0.5rem;
+  font-size: 0.95rem;
+}
+
+.additional-ing {
+  color: #ffb74d; /* Orange to denote they need to buy this */
+}
+
+/* Nutrition Grid */
+.nutrition-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.nutri-item {
+  display: flex;
+  flex-direction: column;
+  background: rgba(255,255,255,0.03);
+  padding: 0.8rem;
+  border-radius: 8px;
+  text-align: center;
+}
+
+.nutri-value {
+  font-size: 1.2rem;
+  font-weight: bold;
+  color: var(--primary-color);
+}
+
+.nutri-label {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Instructions */
+.recipe-instructions {
+  margin-bottom: 1.5rem;
+}
+
+.recipe-instructions ol {
+  padding-left: 1.2rem;
+  line-height: 1.6;
+}
+
+.recipe-instructions li {
+  margin-bottom: 0.8rem;
+}
+
+.health-explanation {
+  background-color: rgba(76, 175, 80, 0.05);
+  padding: 1rem;
+  border-left: 4px solid var(--primary-color);
+  border-radius: 0 4px 4px 0;
+  font-size: 0.95rem;
+  color: #c8e6c9;
   line-height: 1.5;
 }
 
-.success-text {
-  color: var(--primary-color);
-  font-weight: bold;
+@media (max-width: 600px) {
+  .recipe-body {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+  }
 }
 
-.placeholder-note {
-  margin-top: 1.5rem;
+.raw-json-card {
+  background: #1e1e1e;
   padding: 1rem;
-  background-color: rgba(76, 175, 80, 0.1);
-  border-left: 4px solid var(--primary-color);
-  border-radius: 4px;
-  font-style: italic;
-  color: #a5d6a7;
-  text-align: center;
+  border-radius: 8px;
+  overflow-x: auto;
+}
+
+.raw-json-card pre {
+  color: #ff9800;
+  font-size: 0.85rem;
 }
 
 /* Animations */
@@ -215,5 +452,3 @@ input[type="file"] {
 .fade-in {
   animation: fadeIn 0.5s ease-out forwards;
 }
-
-/* Base resets handled mostly by index.css, just overriding specifics here */

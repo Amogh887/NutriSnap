@@ -143,7 +143,7 @@ async def analyze_food(image: UploadFile = File(...)):
         
         # 3. Call the preview model using the exact preview string
         response = client.models.generate_content(
-            model='gemini-2.5-pro',
+            model='gemini-2.5-flash',
             contents=[image_part, prompt],
             config=types.GenerateContentConfig(
                 response_mime_type="application/json",
@@ -154,6 +154,9 @@ async def analyze_food(image: UploadFile = File(...)):
         return recipe_data
         
     except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"ERROR calling Vertex AI: {error_details}")
         raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
