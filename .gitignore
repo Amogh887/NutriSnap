@@ -5,3 +5,4 @@ backend/.env
 # Ignore Python virtual environments
 venv/
 env/
+gcp-key.json
