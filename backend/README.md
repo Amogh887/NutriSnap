@@ -16,7 +16,7 @@ The backend receives food images from the frontend, calls Google Gemini 2.0 Flas
 |---|---|
 | FastAPI | Web framework |
 | Uvicorn | ASGI server |
-| google-genai | Vertex AI / Gemini 2.5 Flash |
+| google-genai | Vertex AI / Gemini 2.0 Flash |
 | firebase-admin | Token verification + Firestore access |
 | python-dotenv | Load `.env` variables |
 | python-multipart | Image file upload parsing |
