@@ -94,7 +94,24 @@ function App() {
     }
   };
 
+<<<<<<< HEAD
   const handleUpload = () => uploadImage(selectedImage);
+=======
+  return (
+    <div className="app-shell">
+      <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
+      
+      <main className="main-viewport">
+        <header className="top-bar">
+          <button className="rounded-btn" onClick={() => setIsSidebarOpen(true)}>
+            <span style={{ fontSize: '1.2rem' }}>⠿</span> Menu
+          </button>
+          <div style={{ fontWeight: 600, fontSize: '1.1rem', letterSpacing: '-0.3px' }}>
+            NutriSnap
+          </div>
+          <div style={{ width: '80px' }}></div> {/* Spacer */}
+        </header>
+>>>>>>> 98757676038c3ff67600eb27b387666ffa89026f
 
   const handleSaveRecipe = async (recipe) => {
     if (!user) {
