@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { requestApi } from '../apiClient';
 
 export default function Profile({ user }) {
   const [profile, setProfile] = useState({
@@ -25,7 +26,8 @@ export default function Profile({ user }) {
     setError(null);
     try {
       const token = await user.getIdToken();
-      const res = await fetch(`http://${window.location.hostname}:8000/api/profile`, {
+      const res = await requestApi({
+        path: 'profile',
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {
@@ -54,7 +56,8 @@ export default function Profile({ user }) {
     
     try {
       const token = await user.getIdToken();
-      const res = await fetch(`http://${window.location.hostname}:8000/api/profile`, {
+      const res = await requestApi({
+        path: 'profile',
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,

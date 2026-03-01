@@ -146,17 +146,46 @@ Using a single input with `capture` caused silent failures on many devices.
 
 ## Dynamic Backend URL
 
-The API base URL is constructed at runtime:
+All frontend API calls go through `src/apiClient.js`.
 
-```javascript
-const backendUrl = `http://${window.location.hostname}:8000/api/analyze-food`;
-```
+Runtime resolution order:
 
-This means:
-- On desktop: `http://localhost:8000/...`
-- On phone (via PC IP): `http://192.168.x.x:8000/...`
+1. `VITE_API_BASE_URL` (if set)
+2. Development fallback: `http://<current-host>:8000`
+3. Production fallback: same-origin (`window.location.origin`)
 
-No environment variable needed for local development.
+For each request path, the client tries these URL shapes in order:
+
+- `/api/<path>`
+- `/api/index.py/<path>`
+- `/<path>`
+
+This fallback strategy is used to support both local FastAPI and Vercel serverless routing.
+
+---
+
+## Vercel Deployment Checklist
+
+Set these environment variables in **Vercel → Project → Settings → Environment Variables**:
+
+Required:
+
+- `GCP_PROJECT_ID`
+- `GCP_LOCATION` (example: `us-central1`)
+- `GEMINI_MODEL` (example: `gemini-2.5-flash`)
+- `GOOGLE_APPLICATION_CREDENTIALS` **or** `GCP_SERVICE_ACCOUNT_JSON`
+- Firebase Web config vars used by the frontend (`VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID`, `VITE_FIREBASE_STORAGE_BUCKET`, `VITE_FIREBASE_MESSAGING_SENDER_ID`, `VITE_FIREBASE_APP_ID`)
+
+Optional:
+
+- `VITE_API_BASE_URL` (leave unset for same-domain API deployment)
+- `FRONTEND_ORIGINS` (comma-separated CORS allowlist)
+
+Quick verification after deploy:
+
+1. Open `https://<your-domain>/api/test` and confirm JSON response.
+2. Sign in and save preferences (tests auth + Firestore).
+3. Upload an image and confirm `POST /api/analyze-food` returns recipes.
 
 ---
 

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { requestApi } from '../apiClient';
 
 export default function AnalysisResults({ data, onReset, onSaveRecipe, savedRecipeIds }) {
   const [expandedRecipes, setExpandedRecipes] = useState({});
@@ -19,7 +20,8 @@ export default function AnalysisResults({ data, onReset, onSaveRecipe, savedReci
 
       const token = await user.getIdToken();
       
-      await fetch(`http://${window.location.hostname}:8000/api/feedback`, {
+      await requestApi({
+        path: 'feedback',
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,

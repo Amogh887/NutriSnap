@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { requestApi } from '../apiClient';
 
 export default function PreferencesSurvey({ isOpen, onClose, user }) {
   const [preferences, setPreferences] = useState({
@@ -25,7 +26,8 @@ export default function PreferencesSurvey({ isOpen, onClose, user }) {
   const fetchPreferences = async () => {
     try {
       const token = await user.getIdToken();
-      const res = await fetch(`http://${window.location.hostname}:8000/api/preferences`, {
+      const res = await requestApi({
+        path: 'preferences',
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {
@@ -44,7 +46,8 @@ export default function PreferencesSurvey({ isOpen, onClose, user }) {
     setSaveStatus('saving');
     try {
       const token = await user.getIdToken();
-      const res = await fetch(`http://${window.location.hostname}:8000/api/preferences`, {
+      const res = await requestApi({
+        path: 'preferences',
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,

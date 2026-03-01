@@ -1,31 +1,39 @@
-import os
 import json
+import os
 from pathlib import Path
 from datetime import datetime, timezone
 from uuid import uuid4
-from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, Request
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-import uvicorn
+
 from dotenv import load_dotenv
+from fastapi import Depends, FastAPI, File, HTTPException, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from google import genai
+from google.api_core.exceptions import PermissionDenied as GooglePermissionDenied
+from google.api_core.exceptions import ServiceUnavailable as GoogleServiceUnavailable
 from google.genai import types
 
 import firebase_admin
-from firebase_admin import credentials, auth, firestore
-from google.api_core.exceptions import PermissionDenied as GooglePermissionDenied
-from google.api_core.exceptions import ServiceUnavailable as GoogleServiceUnavailable
+from firebase_admin import auth, credentials, firestore
 
 BASE_DIR = Path(__file__).resolve().parent
-load_dotenv(BASE_DIR / '.env')
+FRONTEND_DIR = BASE_DIR.parent
+load_dotenv(FRONTEND_DIR / ".env")
 
-credentials_path = os.getenv('GOOGLE_APPLICATION_CREDENTIALS')
+service_account_json = os.getenv("GCP_SERVICE_ACCOUNT_JSON")
+credentials_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+
+if service_account_json and not credentials_path:
+    temp_path = Path("/tmp/gcp-service-account.json")
+    temp_path.write_text(service_account_json, encoding="utf-8")
+    credentials_path = str(temp_path)
+
 if credentials_path:
     credentials_file = Path(credentials_path)
     if not credentials_file.is_absolute():
-        credentials_file = BASE_DIR / credentials_file
-    os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = str(credentials_file.resolve())
+        credentials_file = FRONTEND_DIR / credentials_file
+    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = str(credentials_file.resolve())
 
 app = FastAPI()
 
@@ -33,8 +41,6 @@ frontend_origins = os.getenv("FRONTEND_ORIGINS")
 if frontend_origins:
     allow_origins = [origin.strip() for origin in frontend_origins.split(",") if origin.strip()]
 else:
-    # Token-based auth (Authorization header) does not require CORS credentials.
-    # Keep dev CORS permissive so any local dev origin can call the API.
     allow_origins = ["*"]
 
 app.add_middleware(
@@ -46,17 +52,28 @@ app.add_middleware(
 )
 
 if not firebase_admin._apps:
-    cert_path = os.environ.get('GOOGLE_APPLICATION_CREDENTIALS')
-    cred = credentials.Certificate(cert_path)
-    firebase_admin.initialize_app(cred, {
-        'projectId': os.getenv("GCP_PROJECT_ID"),
-    })
+    cert_path = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
+    if not cert_path:
+        raise RuntimeError("Missing GOOGLE_APPLICATION_CREDENTIALS or GCP_SERVICE_ACCOUNT_JSON")
 
-db = firestore.client()
+    cred = credentials.Certificate(cert_path)
+    firebase_admin.initialize_app(
+        cred,
+        {
+            "projectId": os.getenv("GCP_PROJECT_ID"),
+        },
+    )
+
 security = HTTPBearer(auto_error=False)
+db = firestore.client()
 
 project_id = os.getenv("GCP_PROJECT_ID")
-client = genai.Client(vertexai=True, project=project_id, location="us-central1")
+if not project_id:
+    raise RuntimeError("Missing GCP_PROJECT_ID")
+
+location = os.getenv("GCP_LOCATION", "us-central1")
+model_name = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+client = genai.Client(vertexai=True, project=project_id, location=location)
 
 
 FIRESTORE_PERMISSION_DETAIL = (
@@ -64,7 +81,18 @@ FIRESTORE_PERMISSION_DETAIL = (
     "Grant Firestore/Datastore permissions (for example roles/datastore.user) "
     "to the service account and ensure Firestore is enabled in this project."
 )
-LOCAL_DATA_DIR = BASE_DIR / "local_data"
+LOCAL_DATA_DIR = Path("/tmp/nutrisnap_local_data")
+
+
+DEFAULT_PREFERENCES = {
+    "health_goal": "balanced",
+    "diet_type": "non-vegetarian",
+    "allergies": "none",
+    "cooking_time": "moderate",
+    "cuisine_preferences": "any",
+    "calorie_target": "not specified",
+    "fitness_goal": "general health",
+}
 
 
 def _is_firestore_unavailable(exc: Exception) -> bool:
@@ -126,21 +154,6 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-# ─── Default Preferences (for guests) ───────────────────────────────────────
-
-DEFAULT_PREFERENCES = {
-    "health_goal": "balanced",
-    "diet_type": "non-vegetarian",
-    "allergies": "none",
-    "cooking_time": "moderate",
-    "cuisine_preferences": "any",
-    "calorie_target": "not specified",
-    "fitness_goal": "general health"
-}
-
-
-# ─── Auth Helpers ────────────────────────────────────────────────────────────
-
 def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
     if not credentials:
         return None
@@ -158,10 +171,7 @@ def require_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
     return uid
 
 
-# ─── Preference Fetcher ──────────────────────────────────────────────────────
-
 def get_user_preferences(uid: str | None) -> dict:
-    """Fetch user preferences from Firestore, fall back to defaults."""
     if not uid:
         return DEFAULT_PREFERENCES
     try:
@@ -169,7 +179,6 @@ def get_user_preferences(uid: str | None) -> dict:
         if doc.exists:
             data = doc.to_dict()
             prefs = data.get("preferences", {})
-            # Merge with defaults so missing fields are always filled
             return {**DEFAULT_PREFERENCES, **prefs}
     except Exception as e:
         if _is_firestore_unavailable(e):
@@ -179,24 +188,13 @@ def get_user_preferences(uid: str | None) -> dict:
     return DEFAULT_PREFERENCES
 
 
-# ─── Dynamic Prompt Builder ──────────────────────────────────────────────────
-
 def build_prompt(prefs: dict) -> str:
     return f"""
     You are NutriSnap AI, an advanced multimodal nutrition and cooking assistant built to help users create healthy meals from available ingredients.
 
     Your task is to analyze an image of food ingredients and generate healthy, personalized recipe suggestions.
 
-    ---
-    ### STEP 1: INGREDIENT DETECTION
-    Carefully analyze the provided image and identify all visible food ingredients.
-    - Only include ingredients you are reasonably confident about.
-    - Use generic names (e.g., "tomato", "chicken breast", "spinach", "rice").
-    - Ignore non-food items.
-    - If uncertain, include with "possible" tag.
-
-    ---
-    ### STEP 2: USER PROFILE & PREFERENCES
+    ### USER PROFILE & PREFERENCES
     Tailor ALL recipes strictly to this user's profile:
     - Health Goal: {prefs['health_goal']}
     - Diet Type: {prefs['diet_type']}
@@ -206,44 +204,7 @@ def build_prompt(prefs: dict) -> str:
     - Calorie Target: {prefs['calorie_target']}
     - Fitness Goal: {prefs['fitness_goal']}
 
-    IMPORTANT: If the user has allergies, NEVER include those ingredients.
-    If diet type is vegetarian or vegan, NEVER suggest meat or animal products.
-    Adjust portion sizes and macros to match their calorie target and fitness goal.
-
-    ---
-    ### STEP 3: RECIPE GENERATION
-    Generate 3 to 5 recipe suggestions using the detected ingredients.
-    Rules:
-    - Prioritize recipes that use MOST of the detected ingredients.
-    - Focus on HEALTHY cooking methods (grilling, baking, steaming, sautéing with minimal oil).
-    - Respect the user's cooking time preference.
-    - EXTREMELY IMPORTANT: Provide EXACT measurements and portion sizes for EVERY ingredient (e.g., "150g", "2 cups", "1 tbsp"). Do not simply list the item.
-    - Define an accurate total Yield/Servings for the recipe.
-    - If additional ingredients are required, list them with precise quantities.
-    - MOBILE FRIENDLY FORMATTING: Keep all descriptions and instructions EXTREMELY concise, punchy, and short. Do not write paragraphs. Use 1-2 sentences max for descriptions. Keep each instruction step to one short sentence.
-
-    ---
-    ### STEP 4: HEALTH OPTIMIZATION
-    Each recipe must be optimized for the user's specific health goal:
-    - For weight loss: lower calories, high protein, high fiber
-    - For muscle gain: high protein, adequate carbs, moderate fat
-    - For balanced: even macronutrient distribution
-    - For keto: high fat, very low carbs
-    - Always prefer whole, unprocessed ingredients
-
-    ---
-    ### STEP 5: HEALTH SCORING SYSTEM
-    Assign each recipe a Health Score (1-10) based on:
-    - Nutrient density
-    - Macronutrient balance relative to user's fitness goal
-    - Cooking method
-    - Use of whole vs processed ingredients
-    - Alignment with user's dietary preferences
-    Also include a short explanation: Why the score is high or low for THIS user.
-
-    ---
-    ### STEP 6: OUTPUT FORMAT
-    Return ONLY valid JSON in the following structure:
+    Return ONLY valid JSON in this structure:
     {{
       "detected_ingredients": [],
       "recipes": [
@@ -251,9 +212,9 @@ def build_prompt(prefs: dict) -> str:
           "name": "",
           "description": "",
           "servings": "",
-          "ingredients_used": ["e.g., 2 cups spinach", "1 tbsp olive oil"],
-          "additional_ingredients": ["exact quantities required"],
-          "instructions": ["step 1", "step 2"],
+          "ingredients_used": [],
+          "additional_ingredients": [],
+          "instructions": [],
           "nutrition": {{
             "calories_kcal": "",
             "protein_g": "",
@@ -262,57 +223,38 @@ def build_prompt(prefs: dict) -> str:
           }},
           "health_score": "",
           "health_explanation": "",
-          "diet_tags": ["high-protein", "low-carb", "vegan"],
+          "diet_tags": [],
           "estimated_time_minutes": "",
-          "youtube_query": "specific search string for a recipe tutorial, e.g. 'how to make healthy grilled chicken breast'"
+          "youtube_query": ""
         }}
       ],
-      "ranking": ["recipe_name_1", "recipe_name_2", "recipe_name_3"]
+      "ranking": []
     }}
 
-    ---
-    ### STEP 7: RANKING
-    Sort recipes from most to least aligned with the user's health goal and preferences.
-
-    ---
-    ### STEP 8: EDGE CASE HANDLING
-    - If ingredients are insufficient, suggest 2-3 missing ingredients to create viable recipes.
-    - If the image is unclear, make best reasonable assumptions.
-    - Always provide useful output even with limited ingredients.
-
-    ---
-    ### FINAL INSTRUCTION
-    Your response MUST be valid JSON only. No extra text, no explanations outside JSON.
-    Personalization is critical — recipes must feel tailored to this specific user.
+    Response must be JSON only.
     """
 
 
-# ─── Test Endpoint ───────────────────────────────────────────────────────────
-
 @app.get("/api/test")
 async def test_connection():
-    return {"message": "Hello from the FastAPI backend!"}
+    return {"message": "Hello from the Vercel FastAPI backend!"}
 
-
-# ─── Analyze Food (personalized) ─────────────────────────────────────────────
 
 @app.post("/api/analyze-food")
 async def analyze_food(
     image: UploadFile = File(...),
-    uid: str | None = Depends(get_current_user)
+    uid: str | None = Depends(get_current_user),
 ):
     try:
-        # Fetch preferences (works for both guests and logged-in users)
         prefs = get_user_preferences(uid)
 
         file_bytes = await image.read()
         image_part = types.Part.from_bytes(data=file_bytes, mime_type=image.content_type)
 
-        # Build personalized prompt
         prompt = build_prompt(prefs)
 
         response = client.models.generate_content(
-            model='gemini-2.5-flash',
+            model=model_name,
             contents=[image_part, prompt],
             config=types.GenerateContentConfig(
                 response_mime_type="application/json",
@@ -324,24 +266,24 @@ async def analyze_food(
             response_text = response_text.split("```")[1]
             if response_text.startswith("json"):
                 response_text = response_text[4:]
-        recipe_data = json.loads(response_text)
 
+        recipe_data = json.loads(response_text)
         ingredients = recipe_data.get("detected_ingredients", [])
         if len(ingredients) < 2:
             raise HTTPException(
                 status_code=400,
-                detail="Not enough ingredients detected. Please try a clearer picture with more visible food items."
+                detail="Not enough ingredients detected. Please try a clearer picture with more visible food items.",
             )
 
-        # Auto-save to food history if user is logged in
         if uid:
             try:
                 from google.cloud.firestore import SERVER_TIMESTAMP
+
                 history_entry = {
                     "detected_ingredients": ingredients,
                     "recipes_generated": [r["name"] for r in recipe_data.get("recipes", [])],
                     "analyzed_at": SERVER_TIMESTAMP,
-                    "preferences_used": prefs
+                    "preferences_used": prefs,
                 }
                 db.collection("users").document(uid).collection("food_history").document().set(history_entry)
             except Exception as e:
@@ -364,12 +306,8 @@ async def analyze_food(
     except HTTPException:
         raise
     except Exception as e:
-        import traceback
-        print(f"ERROR: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=str(e))
 
-
-# ─── User Profile ────────────────────────────────────────────────────────────
 
 @app.get("/api/profile")
 async def get_profile(uid: str = Depends(require_user)):
@@ -400,12 +338,9 @@ async def update_profile(data: dict, uid: str = Depends(require_user)):
         raise
 
 
-# ─── Preferences ─────────────────────────────────────────────────────────────
-
 @app.get("/api/preferences")
 async def get_preferences(uid: str = Depends(require_user)):
-    prefs = get_user_preferences(uid)
-    return prefs
+    return get_user_preferences(uid)
 
 
 @app.put("/api/preferences")
@@ -421,8 +356,6 @@ async def update_preferences(prefs: dict, uid: str = Depends(require_user)):
             return {"message": "Preferences updated", "preferences": local["preferences"]}
         raise
 
-
-# ─── Saved Recipes ───────────────────────────────────────────────────────────
 
 @app.get("/api/saved-recipes")
 async def get_saved_recipes(uid: str = Depends(require_user)):
@@ -441,6 +374,7 @@ async def get_saved_recipes(uid: str = Depends(require_user)):
 async def save_recipe(recipe: dict, uid: str = Depends(require_user)):
     try:
         from google.cloud.firestore import SERVER_TIMESTAMP
+
         recipe["saved_at"] = SERVER_TIMESTAMP
         ref = db.collection("users").document(uid).collection("saved_recipes").document()
         ref.set(recipe)
@@ -472,8 +406,6 @@ async def delete_saved_recipe(recipe_id: str, uid: str = Depends(require_user)):
         raise
 
 
-# ─── Food History ────────────────────────────────────────────────────────────
-
 @app.get("/api/food-history")
 async def get_food_history(uid: str = Depends(require_user)):
     try:
@@ -486,8 +418,6 @@ async def get_food_history(uid: str = Depends(require_user)):
             return (local.get("food_history") or [])[:50]
         raise
 
-
-# ─── Feedback ────────────────────────────────────────────────────────────────
 
 @app.post("/api/feedback")
 async def submit_feedback(payload: dict, uid: str = Depends(require_user)):
@@ -513,10 +443,3 @@ async def submit_feedback(payload: dict, uid: str = Depends(require_user)):
             _write_user_store(uid, local)
             return {"message": "Feedback submitted"}
         raise
-
-
-# ─── Run ─────────────────────────────────────────────────────────────────────
-
-if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
-

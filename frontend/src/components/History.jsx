@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { requestApi } from '../apiClient';
 
 export default function History({ user }) {
   const [history, setHistory] = useState([]);
@@ -17,7 +18,8 @@ export default function History({ user }) {
     setIsLoading(true);
     try {
       const token = await user.getIdToken();
-      const res = await fetch(`http://${window.location.hostname}:8000/api/food-history`, {
+      const res = await requestApi({
+        path: 'food-history',
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {

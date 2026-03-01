@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { requestApi } from '../apiClient';
 
 export default function SavedRecipes({ user, onUnsave }) {
   const [recipes, setRecipes] = useState([]);
@@ -17,7 +18,8 @@ export default function SavedRecipes({ user, onUnsave }) {
     setIsLoading(true);
     try {
       const token = await user.getIdToken();
-      const res = await fetch(`http://${window.location.hostname}:8000/api/saved-recipes`, {
+      const res = await requestApi({
+        path: 'saved-recipes',
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {
@@ -37,7 +39,8 @@ export default function SavedRecipes({ user, onUnsave }) {
   const handleUnsave = async (recipeId) => {
     try {
       const token = await user.getIdToken();
-      await fetch(`http://${window.location.hostname}:8000/api/saved-recipes/${recipeId}`, {
+      await requestApi({
+        path: `saved-recipes/${recipeId}`,
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
