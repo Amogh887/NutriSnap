@@ -10,7 +10,8 @@ export default function PreferencesSurvey({ isOpen, onClose, user }) {
     calorie_target: 'not specified',
     cost_preference: '$$',
     spice_level: 'Medium',
-    ease_of_cooking: 'Intermediate'
+    ease_of_cooking: 'Intermediate',
+    has_onboarded: false
   });
   const [isLoading, setIsLoading] = useState(false);
   const [saveStatus, setSaveStatus] = useState(''); // 'saving', 'saved', 'error'
@@ -49,7 +50,7 @@ export default function PreferencesSurvey({ isOpen, onClose, user }) {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(preferences)
+        body: JSON.stringify({ ...preferences, has_onboarded: true })
       });
       
       if (res.ok) {
@@ -89,12 +90,19 @@ export default function PreferencesSurvey({ isOpen, onClose, user }) {
     );
   };
 
-  if (!isOpen) return null;
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '500px', padding: '2rem' }}>
-        <h2 style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>Personalize NutriSnap</h2>
+    <>
+      <div 
+        className={`sidebar-overlay ${isOpen ? 'open' : ''}`} 
+        onClick={onClose}
+      />
+      <div className={`right-drawer ${isOpen ? 'open' : ''}`}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+          <h2 style={{ fontSize: '1.5rem', fontWeight: 600, margin: 0 }}>Personalize</h2>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '1.2rem' }}>✕</button>
+        </div>
+        
         <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '2rem' }}>
           Tell us how you eat. AI will use this to generate perfectly tailored recipes.
         </p>
@@ -145,31 +153,34 @@ export default function PreferencesSurvey({ isOpen, onClose, user }) {
               placeholder="e.g. Mexican, Thai, extra garlic"
               value={preferences.cuisine_preferences === 'any' ? '' : preferences.cuisine_preferences}
               onChange={(e) => setPreferences({...preferences, cuisine_preferences: e.target.value || 'any'})}
-              className="auth-input"
+              style={{
+                width: '100%', padding: '14px 16px', borderRadius: '14px',
+                background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)',
+                color: 'var(--text-primary)', fontSize: '1rem', outline: 'none',
+                transition: 'border-color 0.2s', boxSizing: 'border-box'
+              }}
+              onFocus={(e) => e.target.style.borderColor = 'var(--blue)'}
+              onBlur={(e) => e.target.style.borderColor = 'rgba(255,255,255,0.1)'}
             />
           </div>
 
         </div>
 
-        <div style={{ marginTop: '2.5rem', display: 'flex', gap: '1rem', justifyContent: 'flex-end', alignItems: 'center' }}>
-          {saveStatus === 'saved' && <span style={{ color: 'var(--green)', fontSize: '0.9rem' }}>Saved!</span>}
-          {saveStatus === 'error' && <span style={{ color: 'var(--red)', fontSize: '0.9rem' }}>Error saving</span>}
-          <button 
-            type="button" 
-            onClick={onClose}
-            style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '0.9rem', fontWeight: 500 }}
-          >
-            Cancel
-          </button>
+        <div style={{ marginTop: '2.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', alignItems: 'stretch' }}>
           <button 
             onClick={handleSave} 
             disabled={isLoading}
-            className="rounded-btn"
+            className="rounded-btn primary"
+            style={{ width: '100%', padding: '1rem' }}
           >
             {isLoading ? 'Saving...' : 'Save Preferences'}
           </button>
+          <div style={{ textAlign: 'center', height: '20px' }}>
+            {saveStatus === 'saved' && <span style={{ color: 'var(--green)', fontSize: '0.9rem' }}>Saved efficiently!</span>}
+            {saveStatus === 'error' && <span style={{ color: 'var(--red)', fontSize: '0.9rem' }}>Error saving</span>}
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }

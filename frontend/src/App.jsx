@@ -8,6 +8,9 @@ import Sidebar from './components/Sidebar';
 import UploadCard from './components/UploadCard';
 import AnalysisResults from './components/AnalysisResults';
 import PreferencesSurvey from './components/PreferencesSurvey';
+import SavedRecipes from './components/SavedRecipes';
+import History from './components/History';
+import Profile from './components/Profile';
 import AuthModal from './AuthModal';
 
 function App() {
@@ -17,6 +20,7 @@ function App() {
   const [activeStep, setActiveStep] = useState(0);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
+  const [currentView, setCurrentView] = useState('home');
 
   // Auth state
   const [user, setUser] = useState(null);
@@ -31,8 +35,27 @@ function App() {
 
   // Listen for auth state changes
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       setUser(firebaseUser);
+      if (firebaseUser) {
+        // Check if user has completed survey
+        try {
+          const token = await firebaseUser.getIdToken();
+          const res = await fetch(`http://${window.location.hostname}:8000/api/preferences`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          if (res.ok) {
+            const prefs = await res.json();
+            // If the user has default preferences (e.g. no cuisine set), or if this is their first login
+            // We can decide to show the survey. For now, let's show it if they have no custom cuisine prefs
+            if (prefs.cuisine_preferences === 'any' || !prefs.has_onboarded) {
+              setShowPreferences(true);
+            }
+          }
+        } catch (err) {
+          console.error("Failed to check onboarding status", err);
+        }
+      }
     });
     return () => unsubscribe();
   }, []);
@@ -67,18 +90,29 @@ function App() {
     try {
       setActiveStep(0);
       const backendUrl = `http://${window.location.hostname}:8000/api/analyze-food`;
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 120000); // 120s timeout
+
       const response = await fetch(backendUrl, {
         method: 'POST',
         headers,
         body: formData,
+        signal: controller.signal
       });
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.detail || `Server error: ${response.status}`);
+        const errorText = await response.text();
+        let errorMsg = `Server error: ${response.status}`;
+        try {
+          const errorData = JSON.parse(errorText);
+          errorMsg = errorData.detail || errorMsg;
+        } catch (e) {}
+        throw new Error(errorMsg);
       }
 
       const data = await response.json();
+      console.log("Analysis Result:", data);
       
       setActiveStep(2);
       setTimeout(() => {
@@ -87,8 +121,8 @@ function App() {
       }, 800);
       
     } catch (err) {
-      console.error('Upload error:', err);
-      setError(err.message);
+      console.error('Upload error details:', err);
+      setError(err.message || "An unexpected error occurred. Please check your connection.");
       setIsLoading(false);
     } finally {
       clearInterval(stepInterval);
@@ -151,17 +185,19 @@ function App() {
           setIsSidebarOpen(false);
           setShowPreferences(true);
         }}
+        onNavigate={setCurrentView}
+        currentView={currentView}
       />
       
-      <main className="main-viewport">
+      <main className="main-viewport" style={{ overflowY: (currentView === 'home' && !result && !isLoading) ? 'hidden' : 'auto' }}>
         <header className="top-bar">
           <button className="rounded-btn" onClick={() => setIsSidebarOpen(true)}>
             <span style={{ fontSize: '1.2rem' }}>⠿</span> Menu
           </button>
-          <div style={{ fontWeight: 600, fontSize: '1.1rem', letterSpacing: '-0.3px' }}>
-            NutriSnap
+          <div style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', display: 'flex', alignItems: 'center' }}>
+            <img src="/logo.png" alt="NutriSnap" style={{ height: '36px', objectFit: 'contain' }} />
           </div>
-          <div style={{ width: '80px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
             {!user ? (
                <button 
                  className="rounded-btn" 
@@ -171,15 +207,71 @@ function App() {
                  Sign In
                </button>
              ) : (
-                <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                  👤 {user.email?.split('@')[0]}
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px' }}>
+                  <button 
+                    onClick={() => setShowPreferences(true)}
+                    title="Personalize"
+                    style={{ 
+                      background: 'rgba(255, 255, 255, 0.1)', 
+                      border: '1px solid rgba(255, 255, 255, 0.2)', 
+                      color: '#FFFFFF', 
+                      cursor: 'pointer', 
+                      width: '40px', 
+                      height: '40px', 
+                      borderRadius: '50%', 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'center', 
+                      transition: 'all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                      boxShadow: '0 4px 12px rgba(10, 132, 255, 0.1)',
+                      backdropFilter: 'blur(10px)',
+                      WebkitBackdropFilter: 'blur(10px)'
+                    }}
+                    onMouseOver={(e) => { 
+                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)'; 
+                      e.currentTarget.style.transform = 'scale(1.05)'; 
+                      e.currentTarget.style.boxShadow = '0 6px 16px rgba(0, 0, 0, 0.4)';
+                    }}
+                    onMouseOut={(e) => { 
+                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'; 
+                      e.currentTarget.style.transform = 'scale(1)'; 
+                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.3)';
+                    }}
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="4" y1="6" x2="20" y2="6"></line>
+                      <line x1="4" y1="12" x2="20" y2="12"></line>
+                      <line x1="4" y1="18" x2="20" y2="18"></line>
+                      <circle cx="8" cy="6" r="3" fill="#FFFFFF"></circle>
+                      <circle cx="16" cy="12" r="3" fill="#FFFFFF"></circle>
+                      <circle cx="12" cy="18" r="3" fill="#FFFFFF"></circle>
+                    </svg>
+                  </button>
                 </div>
               )}
             </div>
         </header>
 
         <section className="content-center">
-          {!result ? (
+          {currentView === 'profile' ? (
+            <Profile user={user} />
+          ) : currentView === 'history' ? (
+            <History user={user} />
+          ) : currentView === 'saved_recipes' ? (
+            <SavedRecipes 
+              user={user} 
+              onUnsave={(id) => {
+                const recipeKey = Object.keys(savedRecipeIds).find(key => savedRecipeIds[key] === id);
+                if (recipeKey) {
+                  setSavedRecipeIds(prev => {
+                    const updated = { ...prev };
+                    delete updated[recipeKey];
+                    return updated;
+                  });
+                }
+              }} 
+            />
+          ) : !result ? (
             <div className="fade-in" style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
               <UploadCard 
                 onUpload={handleUpload} 

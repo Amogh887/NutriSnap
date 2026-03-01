@@ -1,4 +1,4 @@
-export default function Sidebar({ isOpen, onClose, user, onSignIn, onSignOut, onOpenPreferences }) {
+export default function Sidebar({ isOpen, onClose, user, onSignIn, onSignOut, onOpenPreferences, onNavigate, currentView }) {
   return (
     <>
       <div 
@@ -24,41 +24,73 @@ export default function Sidebar({ isOpen, onClose, user, onSignIn, onSignOut, on
         )}
 
         <div className="sidebar-links">
-          <div style={{ padding: '0.8rem 1rem', borderRadius: '14px', background: 'rgba(255,255,255,0.05)', color: 'var(--text-primary)', marginBottom: '0.5rem', cursor: 'pointer' }}>
+          <div 
+            onClick={() => { onNavigate('home'); onClose(); }}
+            style={{ 
+              padding: '0.8rem 1rem', 
+              borderRadius: '14px', 
+              background: currentView === 'home' ? 'rgba(255,255,255,0.05)' : 'transparent', 
+              color: currentView === 'home' ? 'var(--text-primary)' : 'var(--text-secondary)', 
+              marginBottom: '0.5rem', 
+              cursor: 'pointer' 
+            }}
+          >
             🏠 Home
           </div>
-          <div style={{ padding: '0.8rem 1rem', borderRadius: '14px', color: 'var(--text-secondary)', marginBottom: '0.5rem', cursor: 'pointer' }}>
-            📈 Nutrition Stats
-          </div>
-          <div style={{ padding: '0.8rem 1rem', borderRadius: '14px', color: 'var(--text-secondary)', marginBottom: '0.5rem', cursor: 'pointer' }}>
-            ❤️ Saved Recipes
+          <div 
+            onClick={() => { onNavigate('history'); onClose(); }}
+            style={{ 
+              padding: '0.8rem 1rem', 
+              borderRadius: '14px', 
+              background: currentView === 'history' ? 'rgba(255,255,255,0.05)' : 'transparent', 
+              color: currentView === 'history' ? 'var(--text-primary)' : 'var(--text-secondary)', 
+              marginBottom: '0.5rem', 
+              cursor: 'pointer' 
+            }}
+          >
+            🕰️ Analysis History
           </div>
           <div 
-            onClick={() => {
-              if (user) {
-                onOpenPreferences();
-              } else {
-                onSignIn();
-              }
+            onClick={() => { onNavigate('profile'); onClose(); }}
+            style={{ 
+              padding: '0.8rem 1rem', 
+              borderRadius: '14px', 
+              background: currentView === 'profile' ? 'rgba(255,255,255,0.05)' : 'transparent', 
+              color: currentView === 'profile' ? 'var(--text-primary)' : 'var(--text-secondary)', 
+              marginBottom: '0.5rem', 
+              cursor: 'pointer' 
             }}
-            style={{ padding: '0.8rem 1rem', borderRadius: '14px', color: 'var(--text-secondary)', marginBottom: '0.5rem', cursor: 'pointer' }}
           >
-            🥑 Personalization
+            👤 User Profile
           </div>
+          <div 
+            onClick={() => { onNavigate('saved_recipes'); onClose(); }}
+            style={{ 
+              padding: '0.8rem 1rem', 
+              borderRadius: '14px', 
+              background: currentView === 'saved_recipes' ? 'rgba(255,255,255,0.05)' : 'transparent', 
+              color: currentView === 'saved_recipes' ? 'var(--text-primary)' : 'var(--text-secondary)', 
+              marginBottom: '0.5rem', 
+              cursor: 'pointer' 
+            }}
+          >
+            ❤️ Saved Recipes
+          </div>
+
         </div>
 
         <div style={{ position: 'absolute', bottom: '2rem', left: '1.5rem', right: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           {!user ? (
             <button 
               className="rounded-btn" 
-              onClick={onSignIn}
+              onClick={() => { onSignIn(); onClose(); }}
               style={{ width: '100%', padding: '0.8rem' }}
             >
               Sign In
             </button>
           ) : (
             <button 
-              onClick={onSignOut}
+              onClick={() => { onSignOut(); onClose(); }}
               style={{ width: '100%', padding: '0.8rem', background: 'rgba(255,255,255,0.05)', border: 'none', borderRadius: '14px', color: 'var(--text-secondary)', cursor: 'pointer' }}
             >
               Sign Out

@@ -1,6 +1,8 @@
 import os
 import json
 from pathlib import Path
+from datetime import datetime, timezone
+from uuid import uuid4
 from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -12,6 +14,8 @@ from google.genai import types
 
 import firebase_admin
 from firebase_admin import credentials, auth, firestore
+from google.api_core.exceptions import PermissionDenied as GooglePermissionDenied
+from google.api_core.exceptions import ServiceUnavailable as GoogleServiceUnavailable
 
 BASE_DIR = Path(__file__).resolve().parent
 load_dotenv(BASE_DIR / '.env')
@@ -25,16 +29,25 @@ if credentials_path:
 
 app = FastAPI()
 
+frontend_origins = os.getenv("FRONTEND_ORIGINS")
+if frontend_origins:
+    allow_origins = [origin.strip() for origin in frontend_origins.split(",") if origin.strip()]
+else:
+    # Token-based auth (Authorization header) does not require CORS credentials.
+    # Keep dev CORS permissive so any local dev origin can call the API.
+    allow_origins = ["*"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=allow_origins,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 if not firebase_admin._apps:
-    cred = credentials.ApplicationDefault()
+    cert_path = os.environ.get('GOOGLE_APPLICATION_CREDENTIALS')
+    cred = credentials.Certificate(cert_path)
     firebase_admin.initialize_app(cred, {
         'projectId': os.getenv("GCP_PROJECT_ID"),
     })
@@ -44,6 +57,70 @@ security = HTTPBearer(auto_error=False)
 
 project_id = os.getenv("GCP_PROJECT_ID")
 client = genai.Client(vertexai=True, project=project_id, location="us-central1")
+
+
+FIRESTORE_PERMISSION_DETAIL = (
+    "Firestore access denied for backend service account. "
+    "Grant Firestore/Datastore permissions (for example roles/datastore.user) "
+    "to the service account and ensure Firestore is enabled in this project."
+)
+LOCAL_DATA_DIR = BASE_DIR / "local_data"
+
+
+def _is_firestore_unavailable(exc: Exception) -> bool:
+    return isinstance(exc, (GooglePermissionDenied, GoogleServiceUnavailable))
+
+
+def _ensure_local_store_dir() -> None:
+    LOCAL_DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def _user_store_path(uid: str) -> Path:
+    safe_uid = "".join(ch for ch in uid if ch.isalnum() or ch in ("-", "_"))
+    return LOCAL_DATA_DIR / f"{safe_uid}.json"
+
+
+def _default_user_store() -> dict:
+    return {
+        "profile": {},
+        "preferences": DEFAULT_PREFERENCES.copy(),
+        "saved_recipes": [],
+        "food_history": [],
+    }
+
+
+def _read_user_store(uid: str) -> dict:
+    _ensure_local_store_dir()
+    path = _user_store_path(uid)
+    if not path.exists():
+        return _default_user_store()
+    try:
+        with path.open("r", encoding="utf-8") as f:
+            data = json.load(f)
+    except Exception:
+        return _default_user_store()
+
+    merged = _default_user_store()
+    merged.update(data if isinstance(data, dict) else {})
+    merged["preferences"] = {**DEFAULT_PREFERENCES, **(merged.get("preferences") or {})}
+    if not isinstance(merged.get("saved_recipes"), list):
+        merged["saved_recipes"] = []
+    if not isinstance(merged.get("food_history"), list):
+        merged["food_history"] = []
+    if not isinstance(merged.get("profile"), dict):
+        merged["profile"] = {}
+    return merged
+
+
+def _write_user_store(uid: str, data: dict) -> None:
+    _ensure_local_store_dir()
+    path = _user_store_path(uid)
+    with path.open("w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2)
+
+
+def _now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
 
 
 # ─── Default Preferences (for guests) ───────────────────────────────────────
@@ -92,23 +169,18 @@ def get_user_preferences(uid: str | None) -> dict:
             # Merge with defaults so missing fields are always filled
             return {**DEFAULT_PREFERENCES, **prefs}
     except Exception as e:
+        if _is_firestore_unavailable(e):
+            local = _read_user_store(uid)
+            return {**DEFAULT_PREFERENCES, **(local.get("preferences") or {})}
         print(f"Could not fetch preferences for {uid}: {e}")
     return DEFAULT_PREFERENCES
 
 
 # ─── Dynamic Prompt Builder ──────────────────────────────────────────────────
 
-def build_prompt(prefs: dict, recent_feedback: list) -> str:
-    feedback_context = ""
-    if recent_feedback:
-        feedback_context = "\n### USER FEEDBACK HISTORY\nThe user recently provided the following feedback on previous recipes. YOU MUST adjust new recipes to account for this:\n"
-        for fb in recent_feedback:
-            feedback_context += f"- Recipe '{fb.get('recipe_name')}': {fb.get('feedback_type')}\n"
-        feedback_context += "(e.g., if they said 'Too Hard', make them simpler. If '👎', avoid similar styles. If '👍', they liked that style.)\n"
-
+def build_prompt(prefs: dict) -> str:
     return f"""
     You are NutriSnap AI, an advanced multimodal nutrition and cooking assistant built to help users create healthy meals from available ingredients.
-    {feedback_context}
 
     Your task is to analyze an image of food ingredients and generate healthy, personalized recipe suggestions.
 
@@ -140,11 +212,12 @@ def build_prompt(prefs: dict, recent_feedback: list) -> str:
     Generate 3 to 5 recipe suggestions using the detected ingredients.
     Rules:
     - Prioritize recipes that use MOST of the detected ingredients.
-    - Minimize need for extra ingredients.
-    - If additional ingredients are required, list them clearly.
     - Focus on HEALTHY cooking methods (grilling, baking, steaming, sautéing with minimal oil).
-    - Avoid ultra-processed foods unless necessary.
-    - Respect the user's cooking time preference — if they want quick meals, keep it under 30 mins.
+    - Respect the user's cooking time preference.
+    - EXTREMELY IMPORTANT: Provide EXACT measurements and portion sizes for EVERY ingredient (e.g., "150g", "2 cups", "1 tbsp"). Do not simply list the item.
+    - Define an accurate total Yield/Servings for the recipe.
+    - If additional ingredients are required, list them with precise quantities.
+    - MOBILE FRIENDLY FORMATTING: Keep all descriptions and instructions EXTREMELY concise, punchy, and short. Do not write paragraphs. Use 1-2 sentences max for descriptions. Keep each instruction step to one short sentence.
 
     ---
     ### STEP 4: HEALTH OPTIMIZATION
@@ -174,8 +247,9 @@ def build_prompt(prefs: dict, recent_feedback: list) -> str:
         {{
           "name": "",
           "description": "",
-          "ingredients_used": [],
-          "additional_ingredients": [],
+          "servings": "",
+          "ingredients_used": ["e.g., 2 cups spinach", "1 tbsp olive oil"],
+          "additional_ingredients": ["exact quantities required"],
           "instructions": ["step 1", "step 2"],
           "nutrition": {{
             "calories_kcal": "",
@@ -186,7 +260,8 @@ def build_prompt(prefs: dict, recent_feedback: list) -> str:
           "health_score": "",
           "health_explanation": "",
           "diet_tags": ["high-protein", "low-carb", "vegan"],
-          "estimated_time_minutes": ""
+          "estimated_time_minutes": "",
+          "youtube_query": "specific search string for a recipe tutorial, e.g. 'how to make healthy grilled chicken breast'"
         }}
       ],
       "ranking": ["recipe_name_1", "recipe_name_2", "recipe_name_3"]
@@ -230,18 +305,11 @@ async def analyze_food(
         file_bytes = await image.read()
         image_part = types.Part.from_bytes(data=file_bytes, mime_type=image.content_type)
 
-        # Fetch recent feedback for prompt tuning
-        recent_feedback = []
-        if uid:
-            feedback_ref = db.collection("users").document(uid).collection("feedback")
-            docs = feedback_ref.order_by("timestamp", direction=firestore.Query.DESCENDING).limit(5).stream()
-            recent_feedback = [doc.to_dict() for doc in docs]
-
         # Build personalized prompt
-        prompt = build_prompt(prefs, recent_feedback)
+        prompt = build_prompt(prefs)
 
         response = client.models.generate_content(
-            model='gemini-2.0-flash',
+            model='gemini-2.5-flash',
             contents=[image_part, prompt],
             config=types.GenerateContentConfig(
                 response_mime_type="application/json",
@@ -274,7 +342,19 @@ async def analyze_food(
                 }
                 db.collection("users").document(uid).collection("food_history").document().set(history_entry)
             except Exception as e:
-                print(f"Could not save food history: {e}")
+                if _is_firestore_unavailable(e):
+                    local = _read_user_store(uid)
+                    history_entry = {
+                        "id": str(uuid4()),
+                        "detected_ingredients": ingredients,
+                        "recipes_generated": [r["name"] for r in recipe_data.get("recipes", [])],
+                        "analyzed_at": _now_iso(),
+                        "preferences_used": prefs,
+                    }
+                    local["food_history"] = [history_entry, *(local.get("food_history") or [])][:50]
+                    _write_user_store(uid, local)
+                else:
+                    print(f"Could not save food history: {e}")
 
         return recipe_data
 
@@ -290,16 +370,31 @@ async def analyze_food(
 
 @app.get("/api/profile")
 async def get_profile(uid: str = Depends(require_user)):
-    doc = db.collection("users").document(uid).get()
-    if not doc.exists:
-        return {"uid": uid, "profile": {}, "preferences": DEFAULT_PREFERENCES}
-    return doc.to_dict()
+    try:
+        doc = db.collection("users").document(uid).get()
+        if not doc.exists:
+            return {"uid": uid, "profile": {}, "preferences": DEFAULT_PREFERENCES}
+        return doc.to_dict()
+    except Exception as e:
+        if _is_firestore_unavailable(e):
+            local = _read_user_store(uid)
+            return {"uid": uid, "profile": local.get("profile", {}), "preferences": local.get("preferences", DEFAULT_PREFERENCES)}
+        raise
 
 
 @app.put("/api/profile")
 async def update_profile(data: dict, uid: str = Depends(require_user)):
-    db.collection("users").document(uid).set(data, merge=True)
-    return {"message": "Profile updated"}
+    try:
+        db.collection("users").document(uid).set(data, merge=True)
+        return {"message": "Profile updated"}
+    except Exception as e:
+        if _is_firestore_unavailable(e):
+            local = _read_user_store(uid)
+            incoming_profile = data.get("profile", {}) if isinstance(data, dict) else {}
+            local["profile"] = {**(local.get("profile") or {}), **incoming_profile}
+            _write_user_store(uid, local)
+            return {"message": "Profile updated"}
+        raise
 
 
 # ─── Preferences ─────────────────────────────────────────────────────────────
@@ -312,51 +407,81 @@ async def get_preferences(uid: str = Depends(require_user)):
 
 @app.put("/api/preferences")
 async def update_preferences(prefs: dict, uid: str = Depends(require_user)):
-    db.collection("users").document(uid).set({"preferences": prefs}, merge=True)
-    return {"message": "Preferences updated", "preferences": prefs}
+    try:
+        db.collection("users").document(uid).set({"preferences": prefs}, merge=True)
+        return {"message": "Preferences updated", "preferences": prefs}
+    except Exception as e:
+        if _is_firestore_unavailable(e):
+            local = _read_user_store(uid)
+            local["preferences"] = {**DEFAULT_PREFERENCES, **(prefs or {})}
+            _write_user_store(uid, local)
+            return {"message": "Preferences updated", "preferences": local["preferences"]}
+        raise
 
 
 # ─── Saved Recipes ───────────────────────────────────────────────────────────
 
 @app.get("/api/saved-recipes")
 async def get_saved_recipes(uid: str = Depends(require_user)):
-    recipes_ref = db.collection("users").document(uid).collection("saved_recipes")
-    docs = recipes_ref.order_by("saved_at", direction=firestore.Query.DESCENDING).stream()
-    return [{"id": doc.id, **doc.to_dict()} for doc in docs]
+    try:
+        recipes_ref = db.collection("users").document(uid).collection("saved_recipes")
+        docs = recipes_ref.order_by("saved_at", direction=firestore.Query.DESCENDING).stream()
+        return [{"id": doc.id, **doc.to_dict()} for doc in docs]
+    except Exception as e:
+        if _is_firestore_unavailable(e):
+            local = _read_user_store(uid)
+            return local.get("saved_recipes", [])
+        raise
 
 
 @app.post("/api/saved-recipes")
 async def save_recipe(recipe: dict, uid: str = Depends(require_user)):
-    from google.cloud.firestore import SERVER_TIMESTAMP
-    recipe["saved_at"] = SERVER_TIMESTAMP
-    ref = db.collection("users").document(uid).collection("saved_recipes").document()
-    ref.set(recipe)
-    return {"id": ref.id, "message": "Recipe saved"}
+    try:
+        from google.cloud.firestore import SERVER_TIMESTAMP
+        recipe["saved_at"] = SERVER_TIMESTAMP
+        ref = db.collection("users").document(uid).collection("saved_recipes").document()
+        ref.set(recipe)
+        return {"id": ref.id, "message": "Recipe saved"}
+    except Exception as e:
+        if _is_firestore_unavailable(e):
+            local = _read_user_store(uid)
+            saved_id = str(uuid4())
+            saved_recipe = {**recipe, "id": saved_id, "saved_at": _now_iso()}
+            local["saved_recipes"] = [saved_recipe, *(local.get("saved_recipes") or [])]
+            _write_user_store(uid, local)
+            return {"id": saved_id, "message": "Recipe saved"}
+        raise
 
 
 @app.delete("/api/saved-recipes/{recipe_id}")
 async def delete_saved_recipe(recipe_id: str, uid: str = Depends(require_user)):
-    db.collection("users").document(uid).collection("saved_recipes").document(recipe_id).delete()
-    return {"message": "Recipe deleted"}
+    try:
+        db.collection("users").document(uid).collection("saved_recipes").document(recipe_id).delete()
+        return {"message": "Recipe deleted"}
+    except Exception as e:
+        if _is_firestore_unavailable(e):
+            local = _read_user_store(uid)
+            local["saved_recipes"] = [
+                item for item in (local.get("saved_recipes") or []) if item.get("id") != recipe_id
+            ]
+            _write_user_store(uid, local)
+            return {"message": "Recipe deleted"}
+        raise
 
 
 # ─── Food History ────────────────────────────────────────────────────────────
 
 @app.get("/api/food-history")
 async def get_food_history(uid: str = Depends(require_user)):
-    history_ref = db.collection("users").document(uid).collection("food_history")
-    docs = history_ref.order_by("analyzed_at", direction=firestore.Query.DESCENDING).limit(50).stream()
-    return [{"id": doc.id, **doc.to_dict()} for doc in docs]
-
-# ─── Feedback ────────────────────────────────────────────────────────────────
-
-@app.post("/api/feedback")
-async def save_feedback(data: dict, uid: str = Depends(require_user)):
-    from google.cloud.firestore import SERVER_TIMESTAMP
-    data["timestamp"] = SERVER_TIMESTAMP
-    ref = db.collection("users").document(uid).collection("feedback").document()
-    ref.set(data)
-    return {"message": "Feedback saved successfully", "id": ref.id}
+    try:
+        history_ref = db.collection("users").document(uid).collection("food_history")
+        docs = history_ref.order_by("analyzed_at", direction=firestore.Query.DESCENDING).limit(50).stream()
+        return [{"id": doc.id, **doc.to_dict()} for doc in docs]
+    except Exception as e:
+        if _is_firestore_unavailable(e):
+            local = _read_user_store(uid)
+            return (local.get("food_history") or [])[:50]
+        raise
 
 
 # ─── Run ─────────────────────────────────────────────────────────────────────

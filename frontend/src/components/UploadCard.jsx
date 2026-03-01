@@ -29,7 +29,7 @@ export default function UploadCard({ onUpload, isLoading, activeStep, steps, err
       className="premium-card"
       style={{
         width: "100%",
-        maxWidth: "500px",
+        maxWidth: "400px",
         textAlign: "center",
         border: dragging
           ? "2px solid var(--blue)"
@@ -41,20 +41,20 @@ export default function UploadCard({ onUpload, isLoading, activeStep, steps, err
       onDragLeave={() => setDragging(false)}
       onDrop={onDrop}
     >
-      <div style={{ marginBottom: '2rem' }}>
-        <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🥗</div>
-        <h2 style={{ fontSize: '1.8rem', fontWeight: 700, margin: '0 0 0.5rem 0', letterSpacing: '-0.5px' }}>
+      <div style={{ marginBottom: '1rem' }}>
+        <div style={{ fontSize: '2rem', marginBottom: '0.4rem' }}>🥗</div>
+        <h2 style={{ fontSize: '1.4rem', fontWeight: 700, margin: '0 0 0.2rem 0', letterSpacing: '-0.5px' }}>
           Analyze your meal
         </h2>
-        <p style={{ color: 'var(--text-secondary)', fontSize: '1rem', lineHeight: 1.5 }}>
-          Upload a photo of your ingredients to get <br/> detailed nutritional insights.
+        <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', lineHeight: 1.4, margin: '0 0 0.5rem 0' }}>
+          Upload a photo of your ingredients to get detailed nutritional insights.
         </p>
       </div>
 
       <div 
-        onClick={() => fileInputRef.current?.click()}
+        onClick={() => galleryInputRef.current?.click()}
         style={{
-          height: '240px',
+          height: '130px',
           borderRadius: 'var(--radius-medium)',
           border: '1px dashed rgba(255,255,255,0.2)',
           display: 'flex',

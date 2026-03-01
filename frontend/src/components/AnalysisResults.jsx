@@ -149,14 +149,62 @@ export default function AnalysisResults({ data, onReset, onSaveRecipe, savedReci
 
               {isExpanded && (
                 <>
+                  {recipe.servings && (
+                    <div style={{ marginBottom: '1.5rem', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
+                      <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>Servings:</span> {recipe.servings}
+                    </div>
+                  )}
                   <div className="fade-in" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: '2rem', marginBottom: '1.5rem' }}>
                     <div>
+                      <h5 style={{ fontSize: '0.8rem', textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: '0.8rem' }}>Ingredients</h5>
+                      <ul style={{ paddingLeft: '1.2rem', margin: '0 0 1.5rem 0', fontSize: '0.9rem', color: 'var(--text-primary)', lineHeight: 1.6 }}>
+                        {recipe.ingredients_used?.map((ing, iIdx) => (
+                          <li key={iIdx} style={{ marginBottom: '6px' }}>{ing}</li>
+                        ))}
+                        {recipe.additional_ingredients?.map((ing, iIdx) => (
+                          <li key={`add-${iIdx}`} style={{ marginBottom: '6px', color: 'var(--text-secondary)' }}>
+                            {ing} <span style={{ fontSize: '0.8rem' }}>(needed)</span>
+                          </li>
+                        ))}
+                      </ul>
+
                       <h5 style={{ fontSize: '0.8rem', textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: '0.8rem' }}>Instructions</h5>
-                      <ol style={{ paddingLeft: '1.2rem', margin: 0, fontSize: '0.9rem', color: 'var(--text-primary)', lineHeight: 1.6 }}>
+                      <ol style={{ paddingLeft: '1.2rem', margin: '0 0 1.5rem 0', fontSize: '0.9rem', color: 'var(--text-primary)', lineHeight: 1.6 }}>
                         {recipe.instructions?.map((step, sIdx) => (
                           <li key={sIdx} style={{ marginBottom: '6px' }}>{step}</li>
                         ))}
                       </ol>
+
+                      {recipe.youtube_query && (
+                        <a 
+                          href={`https://www.youtube.com/results?search_query=${encodeURIComponent(recipe.youtube_query)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            background: 'rgba(255, 0, 0, 0.1)',
+                            color: '#ff4b4b',
+                            textDecoration: 'none',
+                            padding: '8px 16px',
+                            borderRadius: '12px',
+                            fontSize: '0.85rem',
+                            fontWeight: 600,
+                            border: '1px solid rgba(255, 0, 0, 0.2)',
+                            transition: 'all 0.2s',
+                            marginTop: '0.5rem'
+                          }}
+                          onMouseOver={(e) => {
+                            e.target.style.background = 'rgba(255, 0, 0, 0.15)';
+                          }}
+                          onMouseOut={(e) => {
+                            e.target.style.background = 'rgba(255, 0, 0, 0.1)';
+                          }}
+                        >
+                          ▶️ Watch on YouTube
+                        </a>
+                      )}
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                        <h5 style={{ fontSize: '0.8rem', textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: '0.2rem' }}>Nutrition</h5>
