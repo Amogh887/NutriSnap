@@ -133,7 +133,7 @@ export default function UploadCard({ onUpload, isLoading, activeStep, steps, err
           {/* Background Track */}
           <div style={{
             position: 'absolute',
-            left: '19px', // Center of the 24px wide icon span (0.5rem + 12px)
+            left: '21px', // Center of the 28px wide icon span (0.5rem padding [8px] + 14px center - 1px line half-width)
             top: '20px',
             bottom: '24px',
             width: '2px',
@@ -145,7 +145,7 @@ export default function UploadCard({ onUpload, isLoading, activeStep, steps, err
           {/* Active Animated Track */}
           <div style={{
             position: 'absolute',
-            left: '19px',
+            left: '21px',
             top: '20px',
             width: '2px',
             height: `calc(${visualProgress}% * 0.8)`, // Rough mapped height to hit the icons sequentially
@@ -166,7 +166,6 @@ export default function UploadCard({ onUpload, isLoading, activeStep, steps, err
                 marginBottom: '16px',
                 position: 'relative',
                 zIndex: 2,
-                opacity: idx <= activeStep ? 1 : 0.3,
                 transition: 'all 0.4s ease',
                 transform: idx === activeStep ? 'translateX(4px)' : 'none'
               }}>
@@ -175,16 +174,27 @@ export default function UploadCard({ onUpload, isLoading, activeStep, steps, err
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  width: '24px',
-                  height: '24px',
+                  width: '28px',
+                  minWidth: '28px',
+                  height: '28px',
                   background: 'var(--bg-secondary)', // Hide track beneath the icon
-                  borderRadius: '50%'
+                  borderRadius: '50%',
+                  zIndex: 3
                 }}>
-                  {isErrorStep ? '❌' : (idx < activeStep ? '✅' : step.icon)}
+                  <span style={{
+                    opacity: idx <= activeStep ? 1 : 0.3,
+                    filter: idx <= activeStep ? 'none' : 'grayscale(1)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}>
+                    {isErrorStep ? '❌' : (idx < activeStep ? '✅' : step.icon)}
+                  </span>
                 </span>
                 <span style={{ 
                   fontSize: '0.95rem', 
                   fontWeight: idx === activeStep ? 600 : 400,
+                  opacity: idx <= activeStep ? 1 : 0.4,
                   color: isErrorStep ? 'var(--red)' : (idx < activeStep ? 'var(--green)' : 'inherit')
                 }}>
                   {isErrorStep ? error : step.label}
