@@ -1,8 +1,36 @@
 import { useState } from 'react';
 
-export default function AnalysisResults({ data, onReset }) {
+export default function AnalysisResults({ data, onReset, onSaveRecipe, savedRecipeIds }) {
   const [expandedRecipes, setExpandedRecipes] = useState({});
   const [showAllIngredients, setShowAllIngredients] = useState(false);
+  const [feedbackState, setFeedbackState] = useState({}); // { [recipeName]: '👍' | '👎' | 'too_spicy' etc }
+
+  const handleFeedback = async (recipeName, type) => {
+    setFeedbackState(prev => ({ ...prev, [recipeName]: type }));
+    try {
+      // We assume App.jsx logic manages tokens, but since this component doesn't
+      // have direct access to the user, we should ideally pass a callback down. 
+      // For simplicity, we just fire-and-forget to the new backend endpoint.
+      // If no token is provided, the backend can either reject or save anonymously.
+      
+      const auth = await import('../firebase').then(m => m.auth);
+      const user = auth.currentUser;
+      if (!user) return; // Only logged in users can leave feedback
+
+      const token = await user.getIdToken();
+      
+      await fetch(`http://${window.location.hostname}:8000/api/feedback`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ recipe_name: recipeName, feedback_type: type })
+      });
+    } catch (err) {
+      console.error('Failed to submit feedback:', err);
+    }
+  };
 
   if (!data) return null;
 
@@ -79,15 +107,39 @@ export default function AnalysisResults({ data, onReset }) {
                     <span>🔥 {recipe.nutrition?.calories_kcal} kcal</span>
                   </div>
                 </div>
-                <div style={{ 
-                  background: 'var(--green)', 
-                  color: '#000', 
-                  padding: '4px 12px', 
-                  borderRadius: '12px', 
-                  fontWeight: 700, 
-                  fontSize: '0.9rem' 
-                }}>
-                  {recipe.health_score}/10
+                <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                  <div style={{ 
+                    background: 'var(--green)', 
+                    color: '#000', 
+                    padding: '4px 12px', 
+                    borderRadius: '12px', 
+                    fontWeight: 700, 
+                    fontSize: '0.9rem' 
+                  }}>
+                    {recipe.health_score}/10
+                  </div>
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onSaveRecipe(recipe);
+                    }}
+                    style={{
+                      background: savedRecipeIds[recipe.name] ? 'rgba(255, 69, 58, 0.1)' : 'rgba(255,255,255,0.05)',
+                      color: savedRecipeIds[recipe.name] ? 'var(--red)' : 'var(--text-primary)',
+                      border: 'none',
+                      padding: '4px 12px',
+                      borderRadius: '12px',
+                      cursor: 'pointer',
+                      fontSize: '0.9rem',
+                      fontWeight: 600,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    {savedRecipeIds[recipe.name] ? '❤️ Saved' : '🤍 Save'}
+                  </button>
                 </div>
               </div>
               
@@ -96,37 +148,71 @@ export default function AnalysisResults({ data, onReset }) {
               </p>
 
               {isExpanded && (
-                <div className="fade-in" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: '2rem', marginBottom: '1.5rem' }}>
-                  <div>
-                    <h5 style={{ fontSize: '0.8rem', textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: '0.8rem' }}>Instructions</h5>
-                    <ol style={{ paddingLeft: '1.2rem', margin: 0, fontSize: '0.9rem', color: 'var(--text-primary)', lineHeight: 1.6 }}>
-                      {recipe.instructions?.map((step, sIdx) => (
-                        <li key={sIdx} style={{ marginBottom: '6px' }}>{step}</li>
-                      ))}
-                    </ol>
+                <>
+                  <div className="fade-in" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: '2rem', marginBottom: '1.5rem' }}>
+                    <div>
+                      <h5 style={{ fontSize: '0.8rem', textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: '0.8rem' }}>Instructions</h5>
+                      <ol style={{ paddingLeft: '1.2rem', margin: 0, fontSize: '0.9rem', color: 'var(--text-primary)', lineHeight: 1.6 }}>
+                        {recipe.instructions?.map((step, sIdx) => (
+                          <li key={sIdx} style={{ marginBottom: '6px' }}>{step}</li>
+                        ))}
+                      </ol>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                       <h5 style={{ fontSize: '0.8rem', textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: '0.2rem' }}>Nutrition</h5>
+                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                          <div style={{ background: 'rgba(255,255,255,0.03)', padding: '10px', borderRadius: '12px', textAlign: 'center' }}>
+                            <div style={{ fontSize: '1.1rem', fontWeight: 600 }}>{recipe.nutrition?.protein_g}g</div>
+                            <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Protein</div>
+                          </div>
+                          <div style={{ background: 'rgba(255,255,255,0.03)', padding: '10px', borderRadius: '12px', textAlign: 'center' }}>
+                            <div style={{ fontSize: '1.1rem', fontWeight: 600 }}>{recipe.nutrition?.carbs_g}g</div>
+                            <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Carbs</div>
+                          </div>
+                          <div style={{ background: 'rgba(255,255,255,0.03)', padding: '10px', borderRadius: '12px', textAlign: 'center' }}>
+                            <div style={{ fontSize: '1.1rem', fontWeight: 600 }}>{recipe.nutrition?.fat_g}g</div>
+                            <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Fat</div>
+                          </div>
+                          <div style={{ background: 'rgba(255,255,255,0.03)', padding: '10px', borderRadius: '12px', textAlign: 'center' }}>
+                            <div style={{ fontSize: '0.8rem', fontWeight: 600 }}>Fiber</div>
+                            <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>High</div>
+                          </div>
+                       </div>
+                    </div>
                   </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                     <h5 style={{ fontSize: '0.8rem', textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: '0.2rem' }}>Nutrition</h5>
-                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                        <div style={{ background: 'rgba(255,255,255,0.03)', padding: '10px', borderRadius: '12px', textAlign: 'center' }}>
-                          <div style={{ fontSize: '1.1rem', fontWeight: 600 }}>{recipe.nutrition?.protein_g}g</div>
-                          <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Protein</div>
-                        </div>
-                        <div style={{ background: 'rgba(255,255,255,0.03)', padding: '10px', borderRadius: '12px', textAlign: 'center' }}>
-                          <div style={{ fontSize: '1.1rem', fontWeight: 600 }}>{recipe.nutrition?.carbs_g}g</div>
-                          <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Carbs</div>
-                        </div>
-                        <div style={{ background: 'rgba(255,255,255,0.03)', padding: '10px', borderRadius: '12px', textAlign: 'center' }}>
-                          <div style={{ fontSize: '1.1rem', fontWeight: 600 }}>{recipe.nutrition?.fat_g}g</div>
-                          <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Fat</div>
-                        </div>
-                        <div style={{ background: 'rgba(255,255,255,0.03)', padding: '10px', borderRadius: '12px', textAlign: 'center' }}>
-                          <div style={{ fontSize: '0.8rem', fontWeight: 600 }}>Fiber</div>
-                          <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>High</div>
-                        </div>
-                     </div>
+
+                  {/* Feedback Widget */}
+                  <div style={{ 
+                    marginTop: '2rem', 
+                    paddingTop: '1rem', 
+                    borderTop: '1px solid rgba(255,255,255,0.05)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between'
+                  }}>
+                    <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>How was this recipe?</span>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button 
+                        onClick={() => handleFeedback(recipe.name, '👍')}
+                        style={{ background: feedbackState[recipe.name] === '👍' ? 'rgba(76, 175, 80, 0.2)' : 'rgba(255,255,255,0.05)', border: 'none', borderRadius: '20px', padding: '6px 12px', cursor: 'pointer', transition: 'all 0.2s' }}
+                      >
+                        👍 Perfect
+                      </button>
+                      <button 
+                         onClick={() => handleFeedback(recipe.name, 'too_hard')}
+                         style={{ background: feedbackState[recipe.name] === 'too_hard' ? 'rgba(255, 152, 0, 0.2)' : 'rgba(255,255,255,0.05)', border: 'none', borderRadius: '20px', padding: '6px 12px', cursor: 'pointer', color: 'var(--text-secondary)', fontSize: '0.85rem' }}
+                      >
+                        Too Hard
+                      </button>
+                      <button 
+                         onClick={() => handleFeedback(recipe.name, '👎')}
+                         style={{ background: feedbackState[recipe.name] === '👎' ? 'rgba(255, 69, 58, 0.2)' : 'rgba(255,255,255,0.05)', border: 'none', borderRadius: '20px', padding: '6px 12px', cursor: 'pointer' }}
+                      >
+                        👎 Not for me
+                      </button>
+                    </div>
                   </div>
-                </div>
+                </>
               )}
 
               <button 

@@ -98,9 +98,17 @@ def get_user_preferences(uid: str | None) -> dict:
 
 # ─── Dynamic Prompt Builder ──────────────────────────────────────────────────
 
-def build_prompt(prefs: dict) -> str:
+def build_prompt(prefs: dict, recent_feedback: list) -> str:
+    feedback_context = ""
+    if recent_feedback:
+        feedback_context = "\n### USER FEEDBACK HISTORY\nThe user recently provided the following feedback on previous recipes. YOU MUST adjust new recipes to account for this:\n"
+        for fb in recent_feedback:
+            feedback_context += f"- Recipe '{fb.get('recipe_name')}': {fb.get('feedback_type')}\n"
+        feedback_context += "(e.g., if they said 'Too Hard', make them simpler. If '👎', avoid similar styles. If '👍', they liked that style.)\n"
+
     return f"""
     You are NutriSnap AI, an advanced multimodal nutrition and cooking assistant built to help users create healthy meals from available ingredients.
+    {feedback_context}
 
     Your task is to analyze an image of food ingredients and generate healthy, personalized recipe suggestions.
 
@@ -222,11 +230,18 @@ async def analyze_food(
         file_bytes = await image.read()
         image_part = types.Part.from_bytes(data=file_bytes, mime_type=image.content_type)
 
+        # Fetch recent feedback for prompt tuning
+        recent_feedback = []
+        if uid:
+            feedback_ref = db.collection("users").document(uid).collection("feedback")
+            docs = feedback_ref.order_by("timestamp", direction=firestore.Query.DESCENDING).limit(5).stream()
+            recent_feedback = [doc.to_dict() for doc in docs]
+
         # Build personalized prompt
-        prompt = build_prompt(prefs)
+        prompt = build_prompt(prefs, recent_feedback)
 
         response = client.models.generate_content(
-            model='gemini-2.5-flash',
+            model='gemini-2.0-flash',
             contents=[image_part, prompt],
             config=types.GenerateContentConfig(
                 response_mime_type="application/json",
@@ -332,6 +347,16 @@ async def get_food_history(uid: str = Depends(require_user)):
     history_ref = db.collection("users").document(uid).collection("food_history")
     docs = history_ref.order_by("analyzed_at", direction=firestore.Query.DESCENDING).limit(50).stream()
     return [{"id": doc.id, **doc.to_dict()} for doc in docs]
+
+# ─── Feedback ────────────────────────────────────────────────────────────────
+
+@app.post("/api/feedback")
+async def save_feedback(data: dict, uid: str = Depends(require_user)):
+    from google.cloud.firestore import SERVER_TIMESTAMP
+    data["timestamp"] = SERVER_TIMESTAMP
+    ref = db.collection("users").document(uid).collection("feedback").document()
+    ref.set(data)
+    return {"message": "Feedback saved successfully", "id": ref.id}
 
 
 # ─── Run ─────────────────────────────────────────────────────────────────────
