@@ -2,6 +2,7 @@ import { useState } from 'react';
 
 export default function AnalysisResults({ data, onReset }) {
   const [expandedRecipes, setExpandedRecipes] = useState({});
+  const [showAllIngredients, setShowAllIngredients] = useState(false);
 
   if (!data) return null;
 
@@ -11,6 +12,10 @@ export default function AnalysisResults({ data, onReset }) {
       [idx]: !prev[idx]
     }));
   };
+
+  const ingredients = data.detected_ingredients || [];
+  const displayIngredients = showAllIngredients ? ingredients : ingredients.slice(0, 6);
+  const hasMoreIngredients = ingredients.length > 6;
 
   return (
     <div className="premium-card" style={{ width: '100%', maxWidth: '800px', animation: 'fadeIn 0.6s ease-out' }}>
@@ -22,13 +27,35 @@ export default function AnalysisResults({ data, onReset }) {
       {/* Ingredients */}
       <div style={{ marginBottom: '2.5rem' }}>
         <h3 style={{ fontSize: '1.1rem', color: 'var(--text-secondary)', marginBottom: '1rem', textTransform: 'uppercase', letterSpacing: '1px' }}>Detected Ingredients</h3>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-          {data.detected_ingredients?.map((ing, idx) => (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '10px' }}>
+          {displayIngredients.map((ing, idx) => (
             <span key={idx} style={{ padding: '0.6rem 1.2rem', background: 'var(--bg-tertiary)', borderRadius: '20px', fontSize: '0.9rem' }}>
               {ing}
             </span>
           ))}
+          {!showAllIngredients && hasMoreIngredients && (
+            <span style={{ padding: '0.6rem 1.2rem', background: 'rgba(255,255,255,0.05)', borderRadius: '20px', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
+              +{ingredients.length - 6} more
+            </span>
+          )}
         </div>
+        
+        {hasMoreIngredients && (
+          <button 
+            onClick={() => setShowAllIngredients(!showAllIngredients)}
+            style={{ 
+              background: 'none', 
+              border: 'none', 
+              color: 'var(--blue)', 
+              cursor: 'pointer', 
+              padding: 0, 
+              fontSize: '0.85rem', 
+              fontWeight: 500 
+            }}
+          >
+            {showAllIngredients ? 'Show Less ↑' : 'Show All Ingredients ↓'}
+          </button>
+        )}
       </div>
 
       {/* Recipes */}
