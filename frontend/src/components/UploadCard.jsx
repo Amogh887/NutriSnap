@@ -60,7 +60,7 @@ export default function UploadCard({ onUpload, isLoading, activeStep, steps, err
       className="premium-card"
       style={{
         width: "100%",
-        maxWidth: "400px",
+        maxWidth: "340px",
         textAlign: "center",
         border: dragging
           ? "2px solid var(--blue)"
