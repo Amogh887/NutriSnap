@@ -51,29 +51,36 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-if not firebase_admin._apps:
-    cert_path = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
-    if not cert_path:
-        raise RuntimeError("Missing GOOGLE_APPLICATION_CREDENTIALS or GCP_SERVICE_ACCOUNT_JSON")
-
-    cred = credentials.Certificate(cert_path)
-    firebase_admin.initialize_app(
-        cred,
-        {
-            "projectId": os.getenv("GCP_PROJECT_ID"),
-        },
-    )
-
 security = HTTPBearer(auto_error=False)
-db = firestore.client()
-
+db = None
+client = None
 project_id = os.getenv("GCP_PROJECT_ID")
-if not project_id:
-    raise RuntimeError("Missing GCP_PROJECT_ID")
-
 location = os.getenv("GCP_LOCATION", "us-central1")
 model_name = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
-client = genai.Client(vertexai=True, project=project_id, location=location)
+INIT_ERROR = None
+
+try:
+    if not firebase_admin._apps:
+        cert_path = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
+        if not cert_path:
+            raise RuntimeError("Missing GOOGLE_APPLICATION_CREDENTIALS or GCP_SERVICE_ACCOUNT_JSON")
+
+        cred = credentials.Certificate(cert_path)
+        firebase_admin.initialize_app(
+            cred,
+            {
+                "projectId": project_id,
+            },
+        )
+
+    db = firestore.client()
+
+    if not project_id:
+        raise RuntimeError("Missing GCP_PROJECT_ID")
+
+    client = genai.Client(vertexai=True, project=project_id, location=location)
+except Exception as exc:
+    INIT_ERROR = str(exc)
 
 
 FIRESTORE_PERMISSION_DETAIL = (
@@ -152,6 +159,11 @@ def _write_user_store(uid: str, data: dict) -> None:
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def ensure_runtime_ready():
+    if INIT_ERROR:
+        raise HTTPException(status_code=500, detail=f"Backend configuration error: {INIT_ERROR}")
 
 
 def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
@@ -237,13 +249,20 @@ def build_prompt(prefs: dict) -> str:
 
 @app.get("/api/test")
 async def test_connection():
-    return {"message": "Hello from the Vercel FastAPI backend!"}
+    if INIT_ERROR:
+        return {
+            "status": "degraded",
+            "message": "Backend booted with configuration errors",
+            "detail": INIT_ERROR,
+        }
+    return {"status": "ok", "message": "Hello from the Vercel FastAPI backend!"}
 
 
 @app.post("/api/analyze-food")
 async def analyze_food(
     image: UploadFile = File(...),
     uid: str | None = Depends(get_current_user),
+    _: None = Depends(ensure_runtime_ready),
 ):
     try:
         prefs = get_user_preferences(uid)
@@ -310,7 +329,7 @@ async def analyze_food(
 
 
 @app.get("/api/profile")
-async def get_profile(uid: str = Depends(require_user)):
+async def get_profile(uid: str = Depends(require_user), _: None = Depends(ensure_runtime_ready)):
     try:
         doc = db.collection("users").document(uid).get()
         if not doc.exists:
@@ -324,7 +343,7 @@ async def get_profile(uid: str = Depends(require_user)):
 
 
 @app.put("/api/profile")
-async def update_profile(data: dict, uid: str = Depends(require_user)):
+async def update_profile(data: dict, uid: str = Depends(require_user), _: None = Depends(ensure_runtime_ready)):
     try:
         db.collection("users").document(uid).set(data, merge=True)
         return {"message": "Profile updated"}
@@ -339,12 +358,12 @@ async def update_profile(data: dict, uid: str = Depends(require_user)):
 
 
 @app.get("/api/preferences")
-async def get_preferences(uid: str = Depends(require_user)):
+async def get_preferences(uid: str = Depends(require_user), _: None = Depends(ensure_runtime_ready)):
     return get_user_preferences(uid)
 
 
 @app.put("/api/preferences")
-async def update_preferences(prefs: dict, uid: str = Depends(require_user)):
+async def update_preferences(prefs: dict, uid: str = Depends(require_user), _: None = Depends(ensure_runtime_ready)):
     try:
         db.collection("users").document(uid).set({"preferences": prefs}, merge=True)
         return {"message": "Preferences updated", "preferences": prefs}
@@ -358,7 +377,7 @@ async def update_preferences(prefs: dict, uid: str = Depends(require_user)):
 
 
 @app.get("/api/saved-recipes")
-async def get_saved_recipes(uid: str = Depends(require_user)):
+async def get_saved_recipes(uid: str = Depends(require_user), _: None = Depends(ensure_runtime_ready)):
     try:
         recipes_ref = db.collection("users").document(uid).collection("saved_recipes")
         docs = recipes_ref.order_by("saved_at", direction=firestore.Query.DESCENDING).stream()
@@ -371,7 +390,7 @@ async def get_saved_recipes(uid: str = Depends(require_user)):
 
 
 @app.post("/api/saved-recipes")
-async def save_recipe(recipe: dict, uid: str = Depends(require_user)):
+async def save_recipe(recipe: dict, uid: str = Depends(require_user), _: None = Depends(ensure_runtime_ready)):
     try:
         from google.cloud.firestore import SERVER_TIMESTAMP
 
@@ -391,7 +410,7 @@ async def save_recipe(recipe: dict, uid: str = Depends(require_user)):
 
 
 @app.delete("/api/saved-recipes/{recipe_id}")
-async def delete_saved_recipe(recipe_id: str, uid: str = Depends(require_user)):
+async def delete_saved_recipe(recipe_id: str, uid: str = Depends(require_user), _: None = Depends(ensure_runtime_ready)):
     try:
         db.collection("users").document(uid).collection("saved_recipes").document(recipe_id).delete()
         return {"message": "Recipe deleted"}
@@ -407,7 +426,7 @@ async def delete_saved_recipe(recipe_id: str, uid: str = Depends(require_user)):
 
 
 @app.get("/api/food-history")
-async def get_food_history(uid: str = Depends(require_user)):
+async def get_food_history(uid: str = Depends(require_user), _: None = Depends(ensure_runtime_ready)):
     try:
         history_ref = db.collection("users").document(uid).collection("food_history")
         docs = history_ref.order_by("analyzed_at", direction=firestore.Query.DESCENDING).limit(50).stream()
@@ -420,7 +439,7 @@ async def get_food_history(uid: str = Depends(require_user)):
 
 
 @app.post("/api/feedback")
-async def submit_feedback(payload: dict, uid: str = Depends(require_user)):
+async def submit_feedback(payload: dict, uid: str = Depends(require_user), _: None = Depends(ensure_runtime_ready)):
     feedback_entry = {
         "recipe_name": payload.get("recipe_name"),
         "feedback_type": payload.get("feedback_type"),
