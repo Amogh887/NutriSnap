@@ -20,12 +20,24 @@ from google.api_core.exceptions import ServiceUnavailable as GoogleServiceUnavai
 BASE_DIR = Path(__file__).resolve().parent
 load_dotenv(BASE_DIR / '.env')
 
+service_account_json = os.getenv('GCP_SERVICE_ACCOUNT_JSON')
 credentials_path = os.getenv('GOOGLE_APPLICATION_CREDENTIALS')
-if credentials_path:
+
+if service_account_json:
+    temp_path = Path('/tmp/gcp-service-account.json')
+    temp_path.write_text(service_account_json, encoding='utf-8')
+    credentials_path = str(temp_path)
+elif credentials_path:
     credentials_file = Path(credentials_path)
     if not credentials_file.is_absolute():
         credentials_file = BASE_DIR / credentials_file
-    os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = str(credentials_file.resolve())
+    if credentials_file.exists():
+        credentials_path = str(credentials_file.resolve())
+    else:
+        credentials_path = None
+
+if credentials_path:
+    os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = credentials_path
 
 app = FastAPI()
 
@@ -47,6 +59,8 @@ app.add_middleware(
 
 if not firebase_admin._apps:
     cert_path = os.environ.get('GOOGLE_APPLICATION_CREDENTIALS')
+    if not cert_path:
+        raise RuntimeError('Missing GOOGLE_APPLICATION_CREDENTIALS or GCP_SERVICE_ACCOUNT_JSON')
     cred = credentials.Certificate(cert_path)
     firebase_admin.initialize_app(cred, {
         'projectId': os.getenv("GCP_PROJECT_ID"),

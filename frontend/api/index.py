@@ -24,10 +24,18 @@ load_dotenv(FRONTEND_DIR / ".env")
 service_account_json = os.getenv("GCP_SERVICE_ACCOUNT_JSON")
 credentials_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
 
-if service_account_json and not credentials_path:
+if service_account_json:
     temp_path = Path("/tmp/gcp-service-account.json")
     temp_path.write_text(service_account_json, encoding="utf-8")
     credentials_path = str(temp_path)
+elif credentials_path:
+    credentials_candidate = Path(credentials_path)
+    if not credentials_candidate.is_absolute():
+        credentials_candidate = FRONTEND_DIR / credentials_candidate
+    if credentials_candidate.exists():
+        credentials_path = str(credentials_candidate.resolve())
+    else:
+        credentials_path = None
 
 if credentials_path:
     credentials_file = Path(credentials_path)
