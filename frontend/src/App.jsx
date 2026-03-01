@@ -100,6 +100,7 @@ function App() {
       setShowAuthModal(true);
       return;
     }
+    const recipeKey = recipe.name;
     try {
       const token = await getAuthToken();
       const backendUrl = `http://${window.location.hostname}:8000/api/saved-recipes`;
