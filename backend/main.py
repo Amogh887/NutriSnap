@@ -156,8 +156,20 @@ async def analyze_food(image: UploadFile = File(...)):
             if response_text.startswith("json"):
                 response_text = response_text[4:]
         recipe_data = json.loads(response_text)
+        
+        # VALIDATION: Check if enough ingredients are detected
+        ingredients = recipe_data.get("detected_ingredients", [])
+        if len(ingredients) < 2:
+            raise HTTPException(
+                status_code=400, 
+                detail="Not enough ingredients detected. Please try a clearer picture with more visible food items."
+            )
+            
         return recipe_data
         
+    except HTTPException:
+        # Re-raise HTTPExceptions so they aren't caught by the general Exception block
+        raise
     except Exception as e:
         import traceback
         error_details = traceback.format_exc()

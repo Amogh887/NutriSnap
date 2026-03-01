@@ -92,8 +92,10 @@ function App() {
                 isLoading={isLoading} 
                 activeStep={activeStep}
                 steps={steps}
+                error={error}
               />
-              {error && (
+              {/* Only show raw error if not handled by UploadCard's progress bar */}
+              {error && !error.includes("Not enough ingredients") && (
                 <div style={{ 
                   marginTop: '1.5rem', 
                   color: 'var(--red)', 
