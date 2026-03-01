@@ -141,12 +141,26 @@ export default function PreferencesSurvey({ isOpen, onClose, user }) {
 
           <div>
             <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.3rem', color: 'var(--text-secondary)' }}>Diet Type</label>
-            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '8px' }}>
               <OptionButton label="Anything" field="diet_type" value="non-vegetarian" />
               <OptionButton label="Vegetarian" field="diet_type" value="vegetarian" />
               <OptionButton label="Vegan" field="diet_type" value="vegan" />
               <OptionButton label="Keto" field="diet_type" value="keto" />
             </div>
+            <input 
+              type="text" 
+              placeholder="Or enter custom diet type... (e.g. Paleo, Halal)"
+              value={['non-vegetarian', 'vegetarian', 'vegan', 'keto'].includes(preferences.diet_type) ? '' : preferences.diet_type}
+              onChange={(e) => setPreferences({...preferences, diet_type: e.target.value || 'non-vegetarian'})}
+              style={{
+                width: '100%', padding: '10px 14px', borderRadius: '12px',
+                background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)',
+                color: 'var(--text-primary)', fontSize: '0.9rem', outline: 'none',
+                transition: 'border-color 0.2s', boxSizing: 'border-box'
+              }}
+              onFocus={(e) => e.target.style.borderColor = 'var(--blue)'}
+              onBlur={(e) => e.target.style.borderColor = 'rgba(255,255,255,0.1)'}
+            />
           </div>
           
           <div>

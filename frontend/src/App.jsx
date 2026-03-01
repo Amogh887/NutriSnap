@@ -89,7 +89,7 @@ function App() {
         if (prev < steps.length - 2) return prev + 1;
         return prev;
       });
-    }, 2800); 
+    }, 5000);  
 
     try {
       setActiveStep(0);
