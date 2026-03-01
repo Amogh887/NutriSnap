@@ -1,6 +1,8 @@
 import os
 import json
 from pathlib import Path
+from pydantic import BaseModel
+from youtubesearchpython import VideosSearch
 from datetime import datetime, timezone
 from uuid import uuid4
 from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, Request
@@ -322,6 +324,25 @@ async def analyze_food(
             if response_text.startswith("json"):
                 response_text = response_text[4:]
         recipe_data = json.loads(response_text)
+
+        # Append true YouTube thumbnails and video IDs before sending to frontend
+        for recipe in recipe_data.get("recipes", []):
+            try:
+                query = recipe.get("youtube_query")
+                if query:
+                    search = VideosSearch(query, limit=1).result()
+                    if search and search.get("result"):
+                        vid = search["result"][0]
+                        recipe["youtube_video_id"] = vid.get("id")
+                        
+                        # Grab the highest quality thumbnail available
+                        thumbnails = vid.get("thumbnails", [])
+                        if thumbnails:
+                            # Typically the last item in the list is the highest resolution (e.g. maxresdefault)
+                            recipe["youtube_thumbnail"] = thumbnails[-1].get("url")
+            except Exception as e:
+                pass # Fail silently for this single recipe, but proceed with rendering
+
 
         ingredients = recipe_data.get("detected_ingredients", [])
         if len(ingredients) < 2:
