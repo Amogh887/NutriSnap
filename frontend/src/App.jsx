@@ -13,6 +13,47 @@ import History from './components/History';
 import Profile from './components/Profile';
 import AuthModal from './AuthModal';
 
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL ||
+  (import.meta.env.DEV ? `http://${window.location.hostname}:8000` : window.location.origin);
+
+const getApiCandidates = (path) => {
+  const baseUrl = API_BASE_URL.replace(/\/$/, '');
+  const cleanPath = path.replace(/^\/+/, '');
+  return [
+    `${baseUrl}/api/${cleanPath}`,
+    `${baseUrl}/${cleanPath}`,
+  ];
+};
+
+const requestApi = async ({ path, method = 'GET', headers = {}, body, signal }) => {
+  const urls = getApiCandidates(path);
+  let response = null;
+  let lastError = null;
+
+  for (const url of urls) {
+    try {
+      response = await fetch(url, {
+        method,
+        headers,
+        body,
+        signal,
+      });
+
+      if (response.status !== 404) {
+        return response;
+      }
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  if (response) {
+    return response;
+  }
+  throw lastError || new Error('Failed to reach API endpoint.');
+};
+
 function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [showPreferences, setShowPreferences] = useState(false);
@@ -41,7 +82,8 @@ function App() {
         // Check if user has completed survey
         try {
           const token = await firebaseUser.getIdToken();
-          const res = await fetch(`http://${window.location.hostname}:8000/api/preferences`, {
+          const res = await requestApi({
+            path: 'preferences',
             headers: { 'Authorization': `Bearer ${token}` }
           });
           if (res.ok) {
@@ -89,15 +131,15 @@ function App() {
 
     try {
       setActiveStep(0);
-      const backendUrl = `http://${window.location.hostname}:8000/api/analyze-food`;
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 120000); // 120s timeout
 
-      const response = await fetch(backendUrl, {
+      const response = await requestApi({
+        path: 'analyze-food',
         method: 'POST',
         headers,
         body: formData,
-        signal: controller.signal
+        signal: controller.signal,
       });
       clearTimeout(timeoutId);
 
@@ -122,7 +164,13 @@ function App() {
       
     } catch (err) {
       console.error('Upload error details:', err);
-      setError(err.message || "An unexpected error occurred. Please check your connection.");
+      if (err?.name === 'AbortError') {
+        setError('Upload timed out. Please try again with a smaller image or better network.');
+      } else if (err instanceof TypeError) {
+        setError('Load failed. Configure VITE_API_BASE_URL to your deployed backend URL.');
+      } else {
+        setError(err.message || 'An unexpected error occurred. Please check your connection.');
+      }
       setIsLoading(false);
     } finally {
       clearInterval(stepInterval);
@@ -137,13 +185,12 @@ function App() {
     const recipeKey = recipe.name;
     try {
       const token = await getAuthToken();
-      const backendUrl = `http://${window.location.hostname}:8000/api/saved-recipes`;
-
       if (savedRecipeIds[recipeKey]) {
         // Unsave
-        await fetch(`${backendUrl}/${savedRecipeIds[recipeKey]}`, {
+        await requestApi({
+          path: `saved-recipes/${savedRecipeIds[recipeKey]}`,
           method: 'DELETE',
-          headers: { 'Authorization': `Bearer ${token}` }
+          headers: { 'Authorization': `Bearer ${token}` },
         });
         setSavedRecipeIds(prev => {
           const updated = { ...prev };
@@ -152,13 +199,14 @@ function App() {
         });
       } else {
         // Save
-        const res = await fetch(backendUrl, {
+        const res = await requestApi({
+          path: 'saved-recipes',
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
           },
-          body: JSON.stringify(recipe)
+          body: JSON.stringify(recipe),
         });
         const data = await res.json();
         setSavedRecipeIds(prev => ({ ...prev, [recipeKey]: data.id }));
