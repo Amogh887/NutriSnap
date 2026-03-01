@@ -150,7 +150,12 @@ async def analyze_food(image: UploadFile = File(...)):
             ),
         )
         
-        recipe_data = json.loads(response.text)
+        response_text = response.text.strip()
+        if response_text.startswith("```"):
+            response_text = response_text.split("```")[1]
+            if response_text.startswith("json"):
+                response_text = response_text[4:]
+        recipe_data = json.loads(response_text)
         return recipe_data
         
     except Exception as e:
@@ -160,4 +165,4 @@ async def analyze_food(image: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

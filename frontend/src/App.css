@@ -12,6 +12,10 @@
   --transition-speed: 0.3s;
 }
 
+* {
+  box-sizing: border-box;
+}
+
 body {
   margin: 0;
   padding: 0;
@@ -21,12 +25,13 @@ body {
   min-height: 100vh;
   display: flex;
   justify-content: center;
+  -webkit-text-size-adjust: 100%;
 }
 
 .app-container {
   width: 100%;
   max-width: 800px;
-  padding: 2rem;
+  padding: 1.25rem;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
@@ -35,12 +40,12 @@ body {
 
 .header {
   text-align: center;
-  margin-bottom: 3rem;
+  margin-bottom: 1.5rem;
 }
 
 .logo {
-  font-size: 2.5rem;
-  margin: 0 0 0.5rem 0;
+  font-size: 2rem;
+  margin: 0 0 0.4rem 0;
   color: var(--primary-color);
   font-weight: 800;
   letter-spacing: -0.5px;
@@ -49,7 +54,7 @@ body {
 .tagline {
   color: var(--text-muted);
   margin: 0;
-  font-size: 1.1rem;
+  font-size: 0.95rem;
 }
 
 .main-content {
@@ -59,24 +64,21 @@ body {
 .upload-section {
   background-color: var(--card-bg);
   border-radius: var(--border-radius);
-  padding: 2rem;
+  padding: 1.25rem;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1.5rem;
+  gap: 1rem;
   border: 1px solid rgba(255, 255, 255, 0.05);
-  transition: transform var(--transition-speed);
-}
-
-.upload-section:hover {
-  transform: translateY(-2px);
 }
 
 .image-input-wrapper {
   width: 100%;
   display: flex;
   justify-content: center;
+  flex-direction: column;
+  gap: 0.75rem;
 }
 
 input[type="file"] {
@@ -86,14 +88,15 @@ input[type="file"] {
 .custom-file-upload {
   border: 2px dashed var(--primary-color);
   display: inline-block;
-  padding: 1rem 2rem;
+  padding: 0.9rem 1.5rem;
   cursor: pointer;
   border-radius: var(--border-radius);
   color: var(--primary-color);
   font-weight: 600;
   transition: all var(--transition-speed);
-  width: 80%;
+  width: 100%;
   text-align: center;
+  font-size: 0.95rem;
 }
 
 .custom-file-upload:hover {
@@ -104,13 +107,13 @@ input[type="file"] {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1.5rem;
+  gap: 1rem;
   width: 100%;
 }
 
 .image-preview {
-  max-width: 100%;
-  max-height: 300px;
+  width: 100%;
+  max-height: 260px;
   border-radius: 8px;
   object-fit: contain;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
@@ -121,14 +124,16 @@ input[type="file"] {
   background-color: var(--primary-color);
   color: white;
   border: none;
-  padding: 1rem 2rem;
-  font-size: 1.1rem;
+  padding: 0.9rem 1.5rem;
+  font-size: 1rem;
   font-weight: bold;
   border-radius: 30px;
   cursor: pointer;
   width: 100%;
   transition: background-color var(--transition-speed), transform 0.1s;
   box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
+  /* Prevent double-tap zoom on mobile */
+  touch-action: manipulation;
 }
 
 .analyze-button:hover:not(:disabled) {
@@ -146,12 +151,13 @@ input[type="file"] {
 .status-message {
   text-align: center;
   font-size: 0.9rem;
+  width: 100%;
 }
 
 .status-message.error {
   color: #F44336;
   background: rgba(244, 67, 54, 0.1);
-  padding: 1rem;
+  padding: 0.9rem;
   border-radius: var(--border-radius);
   border: 1px solid rgba(244, 67, 54, 0.2);
 }
@@ -161,20 +167,21 @@ input[type="file"] {
   width: 100%;
   display: flex;
   flex-direction: column;
-  gap: 1rem;
-  margin-top: 1rem;
+  gap: 0.6rem;
+  margin-top: 0.5rem;
 }
 
 .pipeline-step {
   display: flex;
   align-items: center;
-  gap: 1rem;
-  padding: 0.8rem 1rem;
+  gap: 0.75rem;
+  padding: 0.7rem 0.9rem;
   background: rgba(255, 255, 255, 0.03);
   border-radius: 8px;
   color: var(--text-muted);
   transition: all 0.3s ease;
   opacity: 0.5;
+  font-size: 0.9rem;
 }
 
 .pipeline-step.active {
@@ -185,7 +192,8 @@ input[type="file"] {
 }
 
 .step-icon {
-  font-size: 1.2rem;
+  font-size: 1.1rem;
+  flex-shrink: 0;
 }
 
 .loading-spinner-small {
@@ -196,23 +204,24 @@ input[type="file"] {
   border-radius: 50%;
   animation: spin 1s linear infinite;
   margin-left: auto;
+  flex-shrink: 0;
 }
 
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
 
-/* Updated Results Section for Gemini API JSON output */
+/* Results Section */
 
 .result-section {
-  margin-top: 2.5rem;
+  margin-top: 1.5rem;
   width: 100%;
 }
 
 .result-section h2 {
   color: var(--primary-color);
-  font-size: 1.8rem;
-  margin-bottom: 1.5rem;
+  font-size: 1.4rem;
+  margin-bottom: 1.25rem;
   text-align: center;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   padding-bottom: 0.5rem;
@@ -221,9 +230,9 @@ input[type="file"] {
 /* Detected Ingredients Card */
 .ingredients-card {
   background-color: var(--card-bg);
-  padding: 1.5rem;
+  padding: 1.25rem;
   border-radius: var(--border-radius);
-  margin-bottom: 2rem;
+  margin-bottom: 1.25rem;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
   border: 1px solid rgba(255, 255, 255, 0.05);
 }
@@ -231,20 +240,20 @@ input[type="file"] {
 .ingredients-card h3 {
   margin-top: 0;
   color: var(--text-light);
-  font-size: 1.2rem;
-  margin-bottom: 1rem;
+  font-size: 1.05rem;
+  margin-bottom: 0.75rem;
 }
 
 .tags-container {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
+  gap: 0.4rem;
 }
 
 .tag {
-  padding: 0.4rem 0.8rem;
+  padding: 0.35rem 0.7rem;
   border-radius: 20px;
-  font-size: 0.9rem;
+  font-size: 0.82rem;
   font-weight: 500;
 }
 
@@ -264,78 +273,80 @@ input[type="file"] {
 .recipes-container {
   display: flex;
   flex-direction: column;
-  gap: 2rem;
+  gap: 1.25rem;
 }
 
 .recipes-container h3 {
   color: var(--text-light);
-  font-size: 1.4rem;
-  margin-bottom: 0.5rem;
+  font-size: 1.2rem;
+  margin-bottom: 0.25rem;
 }
 
 /* Recipe Item Card */
 .recipe-card {
   background-color: var(--card-bg);
   border-radius: var(--border-radius);
-  padding: 2rem;
+  padding: 1.25rem;
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  transition: transform 0.2s ease;
-}
-
-.recipe-card:hover {
-  transform: translateY(-4px);
-  border-color: rgba(76, 175, 80, 0.3);
 }
 
 .recipe-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
+  gap: 0.75rem;
   flex-wrap: wrap;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  padding-bottom: 1rem;
-  margin-bottom: 1rem;
+  padding-bottom: 0.9rem;
+  margin-bottom: 0.9rem;
 }
 
 .recipe-header h4 {
   margin: 0;
-  font-size: 1.5rem;
+  font-size: 1.2rem;
   color: var(--primary-color);
+  flex: 1;
+  min-width: 0;
+  word-break: break-word;
 }
 
 .health-score-badge {
   background: linear-gradient(135deg, #4CAF50, #2E7D32);
   color: white;
-  padding: 0.4rem 1rem;
+  padding: 0.3rem 0.8rem;
   border-radius: 20px;
   font-weight: bold;
-  font-size: 1rem;
-  box-shadow: 0 2px 8px rgba(76, 175, 80, 0.4);
+  font-size: 0.85rem;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .recipe-description {
-  font-size: 1.05rem;
+  font-size: 0.95rem;
   color: var(--text-muted);
   line-height: 1.5;
-  margin-bottom: 1.5rem;
+  margin-bottom: 1rem;
 }
 
 .recipe-meta {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-start;
   align-items: center;
-  gap: 1.5rem;
-  margin-bottom: 1.5rem;
+  gap: 0.6rem;
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
 }
 
+/* Stack to single column on mobile */
 .recipe-body {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 2rem;
-  margin-bottom: 1.5rem;
+  gap: 1.25rem;
+  margin-bottom: 1.25rem;
   background-color: rgba(0,0,0,0.2);
-  padding: 1.5rem;
+  padding: 1rem;
   border-radius: 8px;
 }
 
@@ -343,11 +354,11 @@ input[type="file"] {
 .recipe-nutrition h5,
 .recipe-instructions h5 {
   color: var(--text-light);
-  font-size: 1.1rem;
+  font-size: 0.95rem;
   margin-top: 0;
-  margin-bottom: 1rem;
+  margin-bottom: 0.75rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-  padding-bottom: 0.5rem;
+  padding-bottom: 0.4rem;
 }
 
 .recipe-ingredients ul {
@@ -357,38 +368,39 @@ input[type="file"] {
 }
 
 .recipe-ingredients li {
-  margin-bottom: 0.5rem;
-  font-size: 0.95rem;
+  margin-bottom: 0.4rem;
+  font-size: 0.88rem;
+  line-height: 1.4;
 }
 
 .additional-ing {
-  color: #ffb74d; /* Orange to denote they need to buy this */
+  color: #ffb74d;
 }
 
 /* Nutrition Grid */
 .nutrition-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 1rem;
+  gap: 0.6rem;
 }
 
 .nutri-item {
   display: flex;
   flex-direction: column;
   background: rgba(255,255,255,0.03);
-  padding: 0.8rem;
+  padding: 0.6rem;
   border-radius: 8px;
   text-align: center;
 }
 
 .nutri-value {
-  font-size: 1.2rem;
+  font-size: 1rem;
   font-weight: bold;
   color: var(--primary-color);
 }
 
 .nutri-label {
-  font-size: 0.8rem;
+  font-size: 0.72rem;
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -396,32 +408,60 @@ input[type="file"] {
 
 /* Instructions */
 .recipe-instructions {
-  margin-bottom: 1.5rem;
+  margin-bottom: 1rem;
 }
 
 .recipe-instructions ol {
-  padding-left: 1.2rem;
+  padding-left: 1.1rem;
   line-height: 1.6;
+  margin: 0;
 }
 
 .recipe-instructions li {
-  margin-bottom: 0.8rem;
+  margin-bottom: 0.6rem;
+  font-size: 0.9rem;
 }
 
 .health-explanation {
   background-color: rgba(76, 175, 80, 0.05);
-  padding: 1rem;
+  padding: 0.9rem;
   border-left: 4px solid var(--primary-color);
   border-radius: 0 4px 4px 0;
-  font-size: 0.95rem;
+  font-size: 0.88rem;
   color: #c8e6c9;
   line-height: 1.5;
 }
 
-@media (max-width: 600px) {
+/* Mobile breakpoint */
+@media (max-width: 520px) {
+  .app-container {
+    padding: 0.9rem;
+  }
+
+  .logo {
+    font-size: 1.7rem;
+  }
+
   .recipe-body {
     grid-template-columns: 1fr;
-    gap: 1.5rem;
+    gap: 1rem;
+  }
+
+  .recipe-header {
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .recipe-meta {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.4rem;
+  }
+
+  .diet-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
   }
 }
 
@@ -434,7 +474,7 @@ input[type="file"] {
 
 .raw-json-card pre {
   color: #ff9800;
-  font-size: 0.85rem;
+  font-size: 0.82rem;
 }
 
 /* Animations */

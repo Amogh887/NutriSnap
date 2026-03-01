@@ -48,7 +48,7 @@ function App() {
       // Step 1: Uploading
       setActiveStep(0);
       
-      const backendUrl = `http://localhost:8000/api/analyze-food`;
+      const backendUrl = `http://${window.location.hostname}:8000/api/analyze-food`;
       const response = await fetch(backendUrl, {
         method: 'POST',
         body: formData,
@@ -91,14 +91,24 @@ function App() {
       <main className="main-content">
         <div className="upload-section">
           <div className="image-input-wrapper">
+            <label htmlFor="camera-upload" className="custom-file-upload">
+              {previewUrl ? '📷 Retake Photo' : '📷 Take Photo'}
+            </label>
+            <input 
+              id="camera-upload" 
+              type="file" 
+              accept="image/*" 
+              capture="environment"
+              onChange={handleImageChange} 
+            />
+
             <label htmlFor="file-upload" className="custom-file-upload">
-              {previewUrl ? 'Change Image' : 'Select or Capture Image'}
+              {previewUrl ? '🖼️ Change Image' : '🖼️ Choose from Gallery'}
             </label>
             <input 
               id="file-upload" 
               type="file" 
               accept="image/*" 
-              capture="environment"
               onChange={handleImageChange} 
             />
           </div>
