@@ -6,7 +6,7 @@ FastAPI backend powering the NutriSnap food analysis app.
 
 ## Overview
 
-The backend receives food images from the frontend, calls Google Gemini 2.5 Flash via Vertex AI for ingredient detection and recipe generation, and persists user data in Cloud Firestore. Firebase Admin SDK is used to verify user identity tokens sent from the frontend.
+The backend receives food images from the frontend, calls Google Gemini 2.0 Flash via Vertex AI for ingredient detection and recipe generation, and persists user data in Cloud Firestore. Firebase Admin SDK is used to verify user identity tokens sent from the frontend.
 
 ---
 
