@@ -177,7 +177,53 @@ export default function AnalysisResults({ data, onReset, onSaveRecipe, savedReci
                         ))}
                       </ol>
 
-                      {recipe.youtube_query && (
+                      {recipe.youtube_thumbnail ? (
+                        <a 
+                          href={`https://www.youtube.com/watch?v=${recipe.youtube_video_id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title="Watch Recipe Tutorial"
+                          style={{
+                            display: 'block',
+                            position: 'relative',
+                            width: '100%',
+                            height: '140px',
+                            borderRadius: '16px',
+                            overflow: 'hidden',
+                            marginTop: '1rem',
+                            boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+                            transition: 'transform 0.2s',
+                            textDecoration: 'none'
+                          }}
+                          onMouseOver={(e) => { e.currentTarget.style.transform = 'scale(1.02)'; }}
+                          onMouseOut={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
+                        >
+                          <img 
+                            src={recipe.youtube_thumbnail} 
+                            alt="YouTube Thumbnail" 
+                            style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                          />
+                          <div style={{
+                            position: 'absolute',
+                            top: 0, left: 0, right: 0, bottom: 0,
+                            background: 'linear-gradient(to top, rgba(0,0,0,0.8), rgba(0,0,0,0.2))',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: 'white',
+                            padding: '1rem',
+                            gap: '8px'
+                          }}>
+                            <div style={{ background: 'rgba(255, 0, 0, 0.9)', borderRadius: '50%', width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 12px rgba(255,0,0,0.4)',  paddingLeft: '4px', boxSizing: 'border-box' }}>
+                              ▶️
+                            </div>
+                            <div style={{ fontSize: '0.8rem', fontWeight: 600, textAlign: 'center', textShadow: '0 2px 4px rgba(0,0,0,0.8)' }}>
+                              Watch Tutorial
+                            </div>
+                          </div>
+                        </a>
+                      ) : recipe.youtube_query ? (
                         <a 
                           href={`https://www.youtube.com/results?search_query=${encodeURIComponent(recipe.youtube_query)}`}
                           target="_blank"
@@ -197,16 +243,12 @@ export default function AnalysisResults({ data, onReset, onSaveRecipe, savedReci
                             transition: 'all 0.2s',
                             marginTop: '0.5rem'
                           }}
-                          onMouseOver={(e) => {
-                            e.target.style.background = 'rgba(255, 0, 0, 0.15)';
-                          }}
-                          onMouseOut={(e) => {
-                            e.target.style.background = 'rgba(255, 0, 0, 0.1)';
-                          }}
+                          onMouseOver={(e) => { e.target.style.background = 'rgba(255, 0, 0, 0.15)'; }}
+                          onMouseOut={(e) => { e.target.style.background = 'rgba(255, 0, 0, 0.1)'; }}
                         >
                           ▶️ Watch on YouTube
                         </a>
-                      )}
+                      ) : null}
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                        <h5 style={{ fontSize: '0.8rem', textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: '0.2rem' }}>Nutrition</h5>

@@ -18,7 +18,7 @@ export default function Sidebar({ isOpen, onClose, user, onSignIn, onSignOut, on
             </div>
             <div style={{ overflow: 'hidden' }}>
               <div style={{ fontWeight: 600, fontSize: '0.9rem', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{user.email}</div>
-              <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Pro Member</div>
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Member</div>
             </div>
           </div>
         )}

@@ -1,6 +1,9 @@
 import os
 import json
 from pathlib import Path
+from pydantic import BaseModel
+import re
+import httpx
 from datetime import datetime, timezone
 from uuid import uuid4
 from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, Request
@@ -339,6 +342,22 @@ async def analyze_food(
             if response_text.startswith("json"):
                 response_text = response_text[4:]
         recipe_data = json.loads(response_text)
+
+        # Append true YouTube thumbnails and video IDs before sending to frontend
+        for recipe in recipe_data.get("recipes", []):
+            try:
+                query = recipe.get("youtube_query")
+                if query:
+                    # Search youtube and extract first valid video ID via regex to bypass unofficial API hurdles
+                    r = httpx.get(f"https://www.youtube.com/results?search_query={query.replace(' ', '+')}", timeout=5.0)
+                    video_ids = re.findall(r"watch\?v=([a-zA-Z0-9_-]{11})", r.text)
+                    if video_ids:
+                        vid = video_ids[0]
+                        recipe["youtube_video_id"] = vid
+                        recipe["youtube_thumbnail"] = f"https://i.ytimg.com/vi/{vid}/hqdefault.jpg"
+            except Exception as e:
+                pass # Fail silently for this single recipe, but proceed with rendering
+
 
         ingredients = recipe_data.get("detected_ingredients", [])
         if len(ingredients) < 2:

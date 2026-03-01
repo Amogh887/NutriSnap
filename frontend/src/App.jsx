@@ -29,9 +29,10 @@ function App() {
   const [savedRecipeIds, setSavedRecipeIds] = useState({});
 
   const steps = [
-    { label: 'Uploading image...', icon: '📁' },
-    { label: 'AI analysis in progress...', icon: '🧠' },
-    { label: 'Generating recipes...', icon: '👨‍🍳' }
+    { label: 'Analyzing image data...', icon: '🧠' },
+    { label: 'Detecting raw ingredients...', icon: '🔍' },
+    { label: 'Optimizing health scores...', icon: '🥗' },
+    { label: 'Generating tailored recipes...', icon: '👨‍🍳' }
   ];
 
   // Listen for auth state changes
@@ -84,10 +85,11 @@ function App() {
     // Start a simulation to move through steps if the backend takes a while
     const stepInterval = setInterval(() => {
       setActiveStep((prev) => {
-        if (prev < 2) return prev + 1;
+        // Step automatically up to second-to-last step (index 2 out of 3. Length - 2)
+        if (prev < steps.length - 2) return prev + 1;
         return prev;
       });
-    }, 3000); 
+    }, 2800); 
 
     try {
       setActiveStep(0);
@@ -116,11 +118,14 @@ function App() {
       const data = await response.json();
       console.log("Analysis Result:", data);
       
-      setActiveStep(2);
+      // Push progress bar to the absolute finale
+      setActiveStep(steps.length - 1);
+      
+      // Delay so the animated line completes its journey satisfyingly
       setTimeout(() => {
         setResult(data);
         setIsLoading(false);
-      }, 800);
+      }, 1600);
       
     } catch (err) {
       console.error('Upload error details:', err);
@@ -246,14 +251,16 @@ function App() {
                       e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.5)';
                     }}
                   >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <line x1="4" y1="6" x2="20" y2="6"></line>
-                      <line x1="4" y1="12" x2="20" y2="12"></line>
-                      <line x1="4" y1="18" x2="20" y2="18"></line>
-                      <circle cx="8" cy="6" r="3" fill="#000000"></circle>
-                      <circle cx="16" cy="12" r="3" fill="#000000"></circle>
-                      <circle cx="12" cy="18" r="3" fill="#000000"></circle>
-                    </svg>
+                    <img 
+                      src="/gear.png" 
+                      alt="Preferences Gear" 
+                      style={{ 
+                        filter: 'brightness(0) invert(1)',
+                        width: '24px', 
+                        height: '24px', 
+                        objectFit: 'contain'
+                      }} 
+                    />
                   </button>
                 </div>
               )}

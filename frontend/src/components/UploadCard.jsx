@@ -1,10 +1,41 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 
 export default function UploadCard({ onUpload, isLoading, activeStep, steps, error }) {
   const [dragging, setDragging] = useState(false);
   const [preview, setPreview] = useState(null);
+  const [visualProgress, setVisualProgress] = useState(0);
   const cameraInputRef = useRef(null);
   const galleryInputRef = useRef(null);
+
+  useEffect(() => {
+    if (!isLoading && !error) {
+      setVisualProgress(0);
+      return;
+    }
+    
+    // Calculate percentage checkpoints mapping to steps
+    const stepRatio = 100 / Math.max(steps.length - 1, 1);
+    const snapPosition = activeStep * stepRatio;
+    setVisualProgress(snapPosition); // Immediately snap to current step
+
+    if (activeStep < steps.length - 1 && !error) {
+      // Fake loading progress between steps
+      const maxTarget = snapPosition + (stepRatio * 0.95);
+      
+      const interval = setInterval(() => {
+        setVisualProgress(prev => {
+          if (prev >= maxTarget) return prev;
+          // Random nudge: sometimes slow (0.2), sometimes fast (2.5) to look aesthetic
+          const nudge = Math.random() * 2.5 + 0.2;
+          return Math.min(prev + nudge, maxTarget);
+        });
+      }, 250);
+      
+      return () => clearInterval(interval);
+    } else if (activeStep === steps.length - 1 && !error) {
+      setVisualProgress(100);
+    }
+  }, [activeStep, isLoading, error, steps.length]);
 
   const handleFileChange = (e) => {
     const file = e.target.files[0];
@@ -29,7 +60,7 @@ export default function UploadCard({ onUpload, isLoading, activeStep, steps, err
       className="premium-card"
       style={{
         width: "100%",
-        maxWidth: "400px",
+        maxWidth: "340px",
         textAlign: "center",
         border: dragging
           ? "2px solid var(--blue)"
@@ -76,25 +107,55 @@ export default function UploadCard({ onUpload, isLoading, activeStep, steps, err
             <span style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Tap to capture or drag & drop</span>
           </>
         )}
-        <input 
-          type="file" 
-          ref={cameraInputRef} 
-          hidden 
-          accept="image/*" 
-          capture="environment" 
-          onChange={handleFileChange} 
-        />
-        <input 
-          type="file" 
-          ref={galleryInputRef} 
-          hidden 
-          accept="image/*" 
-          onChange={handleFileChange} 
-        />
       </div>
 
+      <input 
+        type="file" 
+        ref={cameraInputRef} 
+        style={{ display: 'none' }} 
+        accept="image/*" 
+        capture="environment" 
+        onChange={handleFileChange} 
+        onClick={(e) => { e.target.value = null; }}
+      />
+      <input 
+        type="file" 
+        ref={galleryInputRef} 
+        style={{ display: 'none' }} 
+        accept="image/*" 
+        onChange={handleFileChange} 
+        onClick={(e) => { e.target.value = null; }}
+      />
+
       {(isLoading || error) && (
-        <div style={{ textAlign: 'left', marginBottom: '1.5rem' }}>
+        <div style={{ position: 'relative', textAlign: 'left', marginBottom: '2rem', paddingLeft: '0.5rem', marginTop: '1rem' }}>
+          
+          {/* Background Track */}
+          <div style={{
+            position: 'absolute',
+            left: '21px', // Center of the 28px wide icon span (0.5rem padding [8px] + 14px center - 1px line half-width)
+            top: '20px',
+            bottom: '24px',
+            width: '2px',
+            background: 'rgba(255, 255, 255, 0.1)',
+            borderRadius: '2px',
+            zIndex: 0
+          }} />
+          
+          {/* Active Animated Track */}
+          <div style={{
+            position: 'absolute',
+            left: '21px',
+            top: '20px',
+            width: '2px',
+            height: `calc(${visualProgress}% * 0.8)`, // Rough mapped height to hit the icons sequentially
+            background: 'var(--blue)',
+            borderRadius: '2px',
+            zIndex: 1,
+            transition: 'height 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)',
+            boxShadow: '0 0 10px rgba(10, 132, 255, 0.6)'
+          }} />
+
           {steps.map((step, idx) => {
             const isErrorStep = error && idx === activeStep;
             return (
@@ -102,17 +163,38 @@ export default function UploadCard({ onUpload, isLoading, activeStep, steps, err
                 display: 'flex', 
                 alignItems: 'center', 
                 gap: '12px', 
-                marginBottom: '12px',
-                opacity: idx === activeStep ? 1 : idx < activeStep ? 0.7 : 0.2,
+                marginBottom: '16px',
+                position: 'relative',
+                zIndex: 2,
                 transition: 'all 0.4s ease',
                 transform: idx === activeStep ? 'translateX(4px)' : 'none'
               }}>
-                <span style={{ fontSize: '1.2rem' }}>
-                  {isErrorStep ? '❌' : (idx < activeStep ? '✅' : step.icon)}
+                <span style={{ 
+                  fontSize: '1.2rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: '28px',
+                  minWidth: '28px',
+                  height: '28px',
+                  background: 'var(--bg-secondary)', // Hide track beneath the icon
+                  borderRadius: '50%',
+                  zIndex: 3
+                }}>
+                  <span style={{
+                    opacity: idx <= activeStep ? 1 : 0.3,
+                    filter: idx <= activeStep ? 'none' : 'grayscale(1)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}>
+                    {isErrorStep ? '❌' : (idx < activeStep ? '✅' : step.icon)}
+                  </span>
                 </span>
                 <span style={{ 
                   fontSize: '0.95rem', 
                   fontWeight: idx === activeStep ? 600 : 400,
+                  opacity: idx <= activeStep ? 1 : 0.4,
                   color: isErrorStep ? 'var(--red)' : (idx < activeStep ? 'var(--green)' : 'inherit')
                 }}>
                   {isErrorStep ? error : step.label}
