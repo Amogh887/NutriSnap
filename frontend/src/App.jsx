@@ -79,7 +79,7 @@ function App() {
             <span style={{ fontSize: '1.2rem' }}>⠿</span> Menu
           </button>
           <div style={{ fontWeight: 600, fontSize: '1.1rem', letterSpacing: '-0.3px' }}>
-            NutriSlice
+            NutriSnap
           </div>
           <div style={{ width: '80px' }}></div> {/* Spacer */}
         </header>

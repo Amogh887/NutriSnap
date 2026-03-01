@@ -25,7 +25,7 @@ export default function Sidebar({ isOpen, onClose }) {
 
         <div style={{ position: 'absolute', bottom: '2rem', left: '1.5rem', right: '1.5rem' }}>
           <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', textAlign: 'center' }}>
-            NutriSlice v1.0
+            NutriSnap v1.0
           </div>
         </div>
       </div>
