@@ -6,3 +6,9 @@ backend/.env
 venv/
 env/
 gcp-key.json
+
+# Python Cache Files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
