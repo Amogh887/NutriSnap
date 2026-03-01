@@ -96,8 +96,10 @@ function App() {
 
   const handleUpload = () => uploadImage(selectedImage);
 
+  const getRecipeKey = (recipe, idx) => `${idx}:${recipe.name}`;
 
-  const handleSaveRecipe = async (recipe) => {
+  const handleSaveRecipe = async (recipe, idx) => {
+    const recipeKey = getRecipeKey(recipe, idx);
     if (!user) {
       setShowAuthModal(true);
       return;
@@ -106,15 +108,15 @@ function App() {
       const token = await getAuthToken();
       const backendUrl = `http://${window.location.hostname}:8000/api/saved-recipes`;
 
-      if (savedRecipeIds[recipe.name]) {
+      if (savedRecipeIds[recipeKey]) {
         // Unsave
-        await fetch(`${backendUrl}/${savedRecipeIds[recipe.name]}`, {
+        await fetch(`${backendUrl}/${savedRecipeIds[recipeKey]}`, {
           method: 'DELETE',
           headers: { 'Authorization': `Bearer ${token}` }
         });
         setSavedRecipeIds(prev => {
           const updated = { ...prev };
-          delete updated[recipe.name];
+          delete updated[recipeKey];
           return updated;
         });
       } else {
@@ -128,7 +130,7 @@ function App() {
           body: JSON.stringify(recipe)
         });
         const data = await res.json();
-        setSavedRecipeIds(prev => ({ ...prev, [recipe.name]: data.id }));
+        setSavedRecipeIds(prev => ({ ...prev, [recipeKey]: data.id }));
       }
     } catch (err) {
       console.error('Save error:', err);
@@ -265,10 +267,10 @@ function App() {
                           Score: {recipe.health_score}/10
                         </div>
                         <button
-                          className={`save-btn ${savedRecipeIds[recipe.name] ? 'saved' : ''}`}
-                          onClick={() => handleSaveRecipe(recipe)}
+                          className={`save-btn ${savedRecipeIds[getRecipeKey(recipe, idx)] ? 'saved' : ''}`}
+                          onClick={() => handleSaveRecipe(recipe, idx)}
                         >
-                          {savedRecipeIds[recipe.name] ? '❤️ Saved' : '🤍 Save'}
+                          {savedRecipeIds[getRecipeKey(recipe, idx)] ? '❤️ Saved' : '🤍 Save'}
                         </button>
                       </div>
                     </div>

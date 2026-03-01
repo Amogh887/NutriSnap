@@ -1,5 +1,6 @@
 import os
 import json
+from pathlib import Path
 from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -12,7 +13,15 @@ from google.genai import types
 import firebase_admin
 from firebase_admin import credentials, auth, firestore
 
-load_dotenv()
+BASE_DIR = Path(__file__).resolve().parent
+load_dotenv(BASE_DIR / '.env')
+
+credentials_path = os.getenv('GOOGLE_APPLICATION_CREDENTIALS')
+if credentials_path:
+    credentials_file = Path(credentials_path)
+    if not credentials_file.is_absolute():
+        credentials_file = BASE_DIR / credentials_file
+    os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = str(credentials_file.resolve())
 
 app = FastAPI()
 
@@ -329,3 +338,4 @@ async def get_food_history(uid: str = Depends(require_user)):
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+
