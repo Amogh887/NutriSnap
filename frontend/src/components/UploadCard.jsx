@@ -76,22 +76,25 @@ export default function UploadCard({ onUpload, isLoading, activeStep, steps, err
             <span style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Tap to capture or drag & drop</span>
           </>
         )}
-        <input 
-          type="file" 
-          ref={cameraInputRef} 
-          hidden 
-          accept="image/*" 
-          capture="environment" 
-          onChange={handleFileChange} 
-        />
-        <input 
-          type="file" 
-          ref={galleryInputRef} 
-          hidden 
-          accept="image/*" 
-          onChange={handleFileChange} 
-        />
       </div>
+
+      <input 
+        type="file" 
+        ref={cameraInputRef} 
+        style={{ display: 'none' }} 
+        accept="image/*" 
+        capture="environment" 
+        onChange={handleFileChange} 
+        onClick={(e) => { e.target.value = null; }}
+      />
+      <input 
+        type="file" 
+        ref={galleryInputRef} 
+        style={{ display: 'none' }} 
+        accept="image/*" 
+        onChange={handleFileChange} 
+        onClick={(e) => { e.target.value = null; }}
+      />
 
       {(isLoading || error) && (
         <div style={{ textAlign: 'left', marginBottom: '1.5rem' }}>
