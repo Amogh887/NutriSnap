@@ -1,159 +1,88 @@
-import { useState, useRef } from "react";
+﻿import { useRef, useState } from 'react';
 
-export default function UploadCard({ onUpload, isLoading, activeStep, steps, error }) {
-  const [dragging, setDragging] = useState(false);
-  const [preview, setPreview] = useState(null);
+export default function UploadCard({ onAnalyze, isLoading, error }) {
   const cameraInputRef = useRef(null);
   const galleryInputRef = useRef(null);
+  const [dragging, setDragging] = useState(false);
+  const [file, setFile] = useState(null);
+  const [preview, setPreview] = useState('');
 
-  const handleFileChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      setPreview(URL.createObjectURL(file));
-      onUpload(file);
+  const setSelectedFile = (nextFile) => {
+    if (!nextFile || !nextFile.type.startsWith('image/')) {
+      return;
     }
+    setFile(nextFile);
+    setPreview(URL.createObjectURL(nextFile));
   };
 
-  const onDrop = (e) => {
-    e.preventDefault();
-    setDragging(false);
-    const file = e.dataTransfer.files[0];
-    if (file && file.type.startsWith('image/')) {
-      setPreview(URL.createObjectURL(file));
-      onUpload(file);
+  const handleAnalyzeClick = () => {
+    if (!file) {
+      return;
     }
+    onAnalyze(file);
   };
 
   return (
-    <div
-      className="premium-card"
-      style={{
-        width: "100%",
-        maxWidth: "500px",
-        textAlign: "center",
-        border: dragging
-          ? "2px solid var(--blue)"
-          : "1px solid rgba(255,255,255,0.08)",
-        transition: "all 0.3s ease",
-        background: dragging ? "rgba(10, 132, 255, 0.05)" : "var(--bg-secondary)",
+    <article
+      className={`panel upload-card ${dragging ? 'dragging' : ''}`}
+      onDragOver={(event) => {
+        event.preventDefault();
+        setDragging(true);
       }}
-      onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
       onDragLeave={() => setDragging(false)}
-      onDrop={onDrop}
+      onDrop={(event) => {
+        event.preventDefault();
+        setDragging(false);
+        setSelectedFile(event.dataTransfer.files?.[0]);
+      }}
     >
-      <div style={{ marginBottom: '2rem' }}>
-        <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🥗</div>
-        <h2 style={{ fontSize: '1.8rem', fontWeight: 700, margin: '0 0 0.5rem 0', letterSpacing: '-0.5px' }}>
-          Analyze your meal
-        </h2>
-        <p style={{ color: 'var(--text-secondary)', fontSize: '1rem', lineHeight: 1.5 }}>
-          Upload a photo of your ingredients to get <br/> detailed nutritional insights.
-        </p>
-      </div>
+      <h2>Analyze Ingredients</h2>
+      <p>Capture from camera, choose from gallery, or drop an image.</p>
 
-      <div 
-        onClick={() => fileInputRef.current?.click()}
-        style={{
-          height: '240px',
-          borderRadius: 'var(--radius-medium)',
-          border: '1px dashed rgba(255,255,255,0.2)',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          cursor: 'pointer',
-          overflow: 'hidden',
-          position: 'relative',
-          background: 'rgba(255,255,255,0.02)',
-          marginBottom: '1.5rem'
-        }}
-      >
+      <div className="upload-dropzone" onClick={() => galleryInputRef.current?.click()}>
         {preview ? (
-          <img src={preview} alt="Upload preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          <img src={preview} alt="Selected food" />
         ) : (
-          <>
-            <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>📸</div>
-            <span style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Tap to capture or drag & drop</span>
-          </>
+          <div>
+            <strong>Drop image here</strong>
+            <span>PNG, JPG, HEIC</span>
+          </div>
         )}
-        <input 
-          type="file" 
-          ref={cameraInputRef} 
-          hidden 
-          accept="image/*" 
-          capture="environment" 
-          onChange={handleFileChange} 
-        />
-        <input 
-          type="file" 
-          ref={galleryInputRef} 
-          hidden 
-          accept="image/*" 
-          onChange={handleFileChange} 
-        />
       </div>
 
-      {(isLoading || error) && (
-        <div style={{ textAlign: 'left', marginBottom: '1.5rem' }}>
-          {steps.map((step, idx) => {
-            const isErrorStep = error && idx === activeStep;
-            return (
-              <div key={idx} style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: '12px', 
-                marginBottom: '12px',
-                opacity: idx === activeStep ? 1 : idx < activeStep ? 0.7 : 0.2,
-                transition: 'all 0.4s ease',
-                transform: idx === activeStep ? 'translateX(4px)' : 'none'
-              }}>
-                <span style={{ fontSize: '1.2rem' }}>
-                  {isErrorStep ? '❌' : (idx < activeStep ? '✅' : step.icon)}
-                </span>
-                <span style={{ 
-                  fontSize: '0.95rem', 
-                  fontWeight: idx === activeStep ? 600 : 400,
-                  color: isErrorStep ? 'var(--red)' : (idx < activeStep ? 'var(--green)' : 'inherit')
-                }}>
-                  {isErrorStep ? error : step.label}
-                </span>
-                {idx === activeStep && isLoading && (
-                  <div className="loading-spinner-small" style={{ marginLeft: 'auto' }}></div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
+      <input
+        ref={cameraInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        hidden
+        onChange={(event) => setSelectedFile(event.target.files?.[0])}
+      />
+      <input
+        ref={galleryInputRef}
+        type="file"
+        accept="image/*"
+        hidden
+        onChange={(event) => setSelectedFile(event.target.files?.[0])}
+      />
 
-      {!isLoading && !preview && (
-        <div style={{ display: 'flex', gap: '1rem', width: '100%' }}>
-          <button 
-            className="rounded-btn primary" 
-            style={{ flex: 1, padding: '1.1rem' }}
-            onClick={() => cameraInputRef.current?.click()}
-          >
-            📷 Take Photo
-          </button>
-          <button 
-            className="rounded-btn" 
-            style={{ flex: 1, padding: '1.1rem', background: 'rgba(255,255,255,0.1)' }}
-            onClick={() => galleryInputRef.current?.click()}
-          >
-            🖼️ Gallery
-          </button>
-        </div>
-      )}
-
-      {!isLoading && preview && (
-        <button 
-          className="rounded-btn primary" 
-          style={{ width: '100%', padding: '1.1rem' }}
-          onClick={() => galleryInputRef.current?.click()}
-        >
-          Change Photo
+      <div className="upload-actions">
+        <button className="btn btn-ghost" onClick={() => cameraInputRef.current?.click()}>
+          Camera
         </button>
-      )}
-    </div>
+        <button className="btn btn-ghost" onClick={() => galleryInputRef.current?.click()}>
+          Gallery
+        </button>
+        <button
+          className="btn btn-primary"
+          onClick={handleAnalyzeClick}
+          disabled={isLoading || !file}
+        >
+          {isLoading ? 'Analyzing...' : 'Analyze Food'}
+        </button>
+      </div>
+
+      {error && <div className="notice error">{error}</div>}
+    </article>
   );
 }

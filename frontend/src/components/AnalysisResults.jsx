@@ -1,155 +1,143 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 
-export default function AnalysisResults({ data, onReset }) {
-  const [expandedRecipes, setExpandedRecipes] = useState({});
+export default function AnalysisResults({ data, onToggleSave, isSaved, user, onRequireAuth }) {
+  const [expanded, setExpanded] = useState({});
   const [showAllIngredients, setShowAllIngredients] = useState(false);
 
-  if (!data) return null;
-
-  const toggleExpand = (idx) => {
-    setExpandedRecipes(prev => ({
-      ...prev,
-      [idx]: !prev[idx]
-    }));
-  };
+  if (!data) {
+    return null;
+  }
 
   const ingredients = data.detected_ingredients || [];
-  const displayIngredients = showAllIngredients ? ingredients : ingredients.slice(0, 6);
-  const hasMoreIngredients = ingredients.length > 6;
+  const visibleIngredients = showAllIngredients ? ingredients : ingredients.slice(0, 8);
 
   return (
-    <div className="premium-card" style={{ width: '100%', maxWidth: '800px', animation: 'fadeIn 0.6s ease-out' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-        <h2 style={{ fontSize: '1.8rem', fontWeight: 700, margin: 0 }}>Analysis Complete</h2>
-        <button className="rounded-btn" onClick={onReset}>New Analysis</button>
-      </div>
+    <article className="panel analysis-panel">
+      <header className="panel-header">
+        <h2>Analysis Results</h2>
+        <p>{data.recipes?.length || 0} recipe recommendations generated.</p>
+      </header>
 
-      {/* Ingredients */}
-      <div style={{ marginBottom: '2.5rem' }}>
-        <h3 style={{ fontSize: '1.1rem', color: 'var(--text-secondary)', marginBottom: '1rem', textTransform: 'uppercase', letterSpacing: '1px' }}>Detected Ingredients</h3>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '10px' }}>
-          {displayIngredients.map((ing, idx) => (
-            <span key={idx} style={{ padding: '0.6rem 1.2rem', background: 'var(--bg-tertiary)', borderRadius: '20px', fontSize: '0.9rem' }}>
-              {ing}
-            </span>
-          ))}
-          {!showAllIngredients && hasMoreIngredients && (
-            <span style={{ padding: '0.6rem 1.2rem', background: 'rgba(255,255,255,0.05)', borderRadius: '20px', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
-              +{ingredients.length - 6} more
-            </span>
+      <section>
+        <div className="row between">
+          <h3>Detected Ingredients</h3>
+          {ingredients.length > 8 && (
+            <button className="btn btn-ghost" onClick={() => setShowAllIngredients((prev) => !prev)}>
+              {showAllIngredients ? 'Show Less' : 'Show All'}
+            </button>
           )}
         </div>
-        
-        {hasMoreIngredients && (
-          <button 
-            onClick={() => setShowAllIngredients(!showAllIngredients)}
-            style={{ 
-              background: 'none', 
-              border: 'none', 
-              color: 'var(--blue)', 
-              cursor: 'pointer', 
-              padding: 0, 
-              fontSize: '0.85rem', 
-              fontWeight: 500 
-            }}
-          >
-            {showAllIngredients ? 'Show Less ↑' : 'Show All Ingredients ↓'}
-          </button>
-        )}
-      </div>
 
-      {/* Recipes */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-        <h3 style={{ fontSize: '1.1rem', color: 'var(--text-secondary)', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '1px' }}>Recipe Suggestions</h3>
-        {data.recipes?.map((recipe, idx) => {
-          const isExpanded = expandedRecipes[idx];
+        <div className="chips">
+          {visibleIngredients.map((item, idx) => (
+            <span key={`${item}-${idx}`} className="chip">{item}</span>
+          ))}
+        </div>
+      </section>
+
+      {(data.ranking || []).length > 0 && (
+        <section className="ranking">
+          <h3>Ranking</h3>
+          <ol>
+            {data.ranking.map((name, idx) => (
+              <li key={`${name}-${idx}`}>{name}</li>
+            ))}
+          </ol>
+        </section>
+      )}
+
+      <section className="recipe-grid">
+        {(data.recipes || []).map((recipe, idx) => {
+          const expandedState = Boolean(expanded[idx]);
+          const saved = isSaved ? isSaved(recipe) : false;
+
           return (
-            <div key={idx} className="recipe-card-minimal" style={{ 
-              background: 'var(--bg-tertiary)', 
-              padding: '1.5rem', 
-              borderRadius: 'var(--radius-medium)',
-              border: '1px solid rgba(255,255,255,0.03)',
-              transition: 'all 0.3s ease'
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
-                <div>
-                  <h4 style={{ fontSize: '1.3rem', margin: '0 0 0.4rem 0' }}>{recipe.name}</h4>
-                  <div style={{ display: 'flex', gap: '12px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                    <span>⏱️ {recipe.estimated_time_minutes}</span>
-                    <span>🔥 {recipe.nutrition?.calories_kcal} kcal</span>
-                  </div>
-                </div>
-                <div style={{ 
-                  background: 'var(--green)', 
-                  color: '#000', 
-                  padding: '4px 12px', 
-                  borderRadius: '12px', 
-                  fontWeight: 700, 
-                  fontSize: '0.9rem' 
-                }}>
-                  {recipe.health_score}/10
-                </div>
+            <article className="recipe-tile" key={`${recipe.name}-${idx}`}>
+              <div className="recipe-tile-head">
+                <h3>{recipe.name}</h3>
+                <span className="score">{recipe.health_score || '-'} / 10</span>
               </div>
-              
-              <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', lineHeight: 1.5, marginBottom: isExpanded ? '1.5rem' : '1rem' }}>
-                {recipe.description}
-              </p>
 
-              {isExpanded && (
-                <div className="fade-in" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: '2rem', marginBottom: '1.5rem' }}>
+              <p>{recipe.description}</p>
+
+              <div className="chips">
+                <span className="chip">{recipe.estimated_time_minutes || 'n/a'}</span>
+                {(recipe.diet_tags || []).map((tag) => (
+                  <span className="chip" key={tag}>{tag}</span>
+                ))}
+              </div>
+
+              <div className="tile-actions">
+                <button
+                  className="btn btn-ghost"
+                  onClick={() => setExpanded((prev) => ({ ...prev, [idx]: !prev[idx] }))}
+                >
+                  {expandedState ? 'Hide Details' : 'Show Details'}
+                </button>
+
+                <button
+                  className={`btn ${saved ? 'btn-success' : 'btn-primary'}`}
+                  onClick={() => {
+                    if (!user) {
+                      onRequireAuth?.();
+                      return;
+                    }
+                    onToggleSave?.(recipe);
+                  }}
+                >
+                  {saved ? 'Saved' : 'Save'}
+                </button>
+              </div>
+
+              {expandedState && (
+                <div className="details-grid">
                   <div>
-                    <h5 style={{ fontSize: '0.8rem', textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: '0.8rem' }}>Instructions</h5>
-                    <ol style={{ paddingLeft: '1.2rem', margin: 0, fontSize: '0.9rem', color: 'var(--text-primary)', lineHeight: 1.6 }}>
-                      {recipe.instructions?.map((step, sIdx) => (
-                        <li key={sIdx} style={{ marginBottom: '6px' }}>{step}</li>
+                    <h4>Ingredients Used</h4>
+                    <ul>
+                      {(recipe.ingredients_used || []).map((item, itemIdx) => (
+                        <li key={`${item}-${itemIdx}`}>{item}</li>
+                      ))}
+                    </ul>
+
+                    {(recipe.additional_ingredients || []).length > 0 && (
+                      <>
+                        <h4>Additional Ingredients</h4>
+                        <ul>
+                          {recipe.additional_ingredients.map((item, itemIdx) => (
+                            <li key={`${item}-${itemIdx}`}>{item}</li>
+                          ))}
+                        </ul>
+                      </>
+                    )}
+                  </div>
+
+                  <div>
+                    <h4>Nutrition</h4>
+                    <ul>
+                      <li>Calories: {recipe.nutrition?.calories_kcal || 'n/a'}</li>
+                      <li>Protein: {recipe.nutrition?.protein_g || 'n/a'}</li>
+                      <li>Carbs: {recipe.nutrition?.carbs_g || 'n/a'}</li>
+                      <li>Fat: {recipe.nutrition?.fat_g || 'n/a'}</li>
+                    </ul>
+
+                    <h4>Health Context</h4>
+                    <p>{recipe.health_explanation || 'No explanation available.'}</p>
+                  </div>
+
+                  <div className="full">
+                    <h4>Instructions</h4>
+                    <ol>
+                      {(recipe.instructions || []).map((step, stepIdx) => (
+                        <li key={`${step}-${stepIdx}`}>{step}</li>
                       ))}
                     </ol>
                   </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                     <h5 style={{ fontSize: '0.8rem', textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: '0.2rem' }}>Nutrition</h5>
-                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                        <div style={{ background: 'rgba(255,255,255,0.03)', padding: '10px', borderRadius: '12px', textAlign: 'center' }}>
-                          <div style={{ fontSize: '1.1rem', fontWeight: 600 }}>{recipe.nutrition?.protein_g}g</div>
-                          <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Protein</div>
-                        </div>
-                        <div style={{ background: 'rgba(255,255,255,0.03)', padding: '10px', borderRadius: '12px', textAlign: 'center' }}>
-                          <div style={{ fontSize: '1.1rem', fontWeight: 600 }}>{recipe.nutrition?.carbs_g}g</div>
-                          <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Carbs</div>
-                        </div>
-                        <div style={{ background: 'rgba(255,255,255,0.03)', padding: '10px', borderRadius: '12px', textAlign: 'center' }}>
-                          <div style={{ fontSize: '1.1rem', fontWeight: 600 }}>{recipe.nutrition?.fat_g}g</div>
-                          <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Fat</div>
-                        </div>
-                        <div style={{ background: 'rgba(255,255,255,0.03)', padding: '10px', borderRadius: '12px', textAlign: 'center' }}>
-                          <div style={{ fontSize: '0.8rem', fontWeight: 600 }}>Fiber</div>
-                          <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>High</div>
-                        </div>
-                     </div>
-                  </div>
                 </div>
               )}
-
-              <button 
-                onClick={() => toggleExpand(idx)}
-                style={{ 
-                  background: 'none', 
-                  border: 'none', 
-                  color: 'var(--blue)', 
-                  cursor: 'pointer', 
-                  padding: 0, 
-                  fontSize: '0.9rem', 
-                  fontWeight: 500,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px'
-                }}
-              >
-                {isExpanded ? 'Show Less ↑' : 'Show Full Recipe ↓'}
-              </button>
-            </div>
+            </article>
           );
         })}
-      </div>
-    </div>
+      </section>
+    </article>
   );
 }

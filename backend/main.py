@@ -1,6 +1,8 @@
 import os
 import json
 from pathlib import Path
+from datetime import datetime, timezone
+from uuid import uuid4
 from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -12,6 +14,8 @@ from google.genai import types
 
 import firebase_admin
 from firebase_admin import credentials, auth, firestore
+from google.api_core.exceptions import PermissionDenied as GooglePermissionDenied
+from google.api_core.exceptions import ServiceUnavailable as GoogleServiceUnavailable
 
 BASE_DIR = Path(__file__).resolve().parent
 load_dotenv(BASE_DIR / '.env')
@@ -25,10 +29,18 @@ if credentials_path:
 
 app = FastAPI()
 
+frontend_origins = os.getenv("FRONTEND_ORIGINS")
+if frontend_origins:
+    allow_origins = [origin.strip() for origin in frontend_origins.split(",") if origin.strip()]
+else:
+    # Token-based auth (Authorization header) does not require CORS credentials.
+    # Keep dev CORS permissive so any local dev origin can call the API.
+    allow_origins = ["*"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=allow_origins,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -44,6 +56,70 @@ security = HTTPBearer(auto_error=False)
 
 project_id = os.getenv("GCP_PROJECT_ID")
 client = genai.Client(vertexai=True, project=project_id, location="us-central1")
+
+
+FIRESTORE_PERMISSION_DETAIL = (
+    "Firestore access denied for backend service account. "
+    "Grant Firestore/Datastore permissions (for example roles/datastore.user) "
+    "to the service account and ensure Firestore is enabled in this project."
+)
+LOCAL_DATA_DIR = BASE_DIR / "local_data"
+
+
+def _is_firestore_unavailable(exc: Exception) -> bool:
+    return isinstance(exc, (GooglePermissionDenied, GoogleServiceUnavailable))
+
+
+def _ensure_local_store_dir() -> None:
+    LOCAL_DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def _user_store_path(uid: str) -> Path:
+    safe_uid = "".join(ch for ch in uid if ch.isalnum() or ch in ("-", "_"))
+    return LOCAL_DATA_DIR / f"{safe_uid}.json"
+
+
+def _default_user_store() -> dict:
+    return {
+        "profile": {},
+        "preferences": DEFAULT_PREFERENCES.copy(),
+        "saved_recipes": [],
+        "food_history": [],
+    }
+
+
+def _read_user_store(uid: str) -> dict:
+    _ensure_local_store_dir()
+    path = _user_store_path(uid)
+    if not path.exists():
+        return _default_user_store()
+    try:
+        with path.open("r", encoding="utf-8") as f:
+            data = json.load(f)
+    except Exception:
+        return _default_user_store()
+
+    merged = _default_user_store()
+    merged.update(data if isinstance(data, dict) else {})
+    merged["preferences"] = {**DEFAULT_PREFERENCES, **(merged.get("preferences") or {})}
+    if not isinstance(merged.get("saved_recipes"), list):
+        merged["saved_recipes"] = []
+    if not isinstance(merged.get("food_history"), list):
+        merged["food_history"] = []
+    if not isinstance(merged.get("profile"), dict):
+        merged["profile"] = {}
+    return merged
+
+
+def _write_user_store(uid: str, data: dict) -> None:
+    _ensure_local_store_dir()
+    path = _user_store_path(uid)
+    with path.open("w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2)
+
+
+def _now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
 
 
 # ─── Default Preferences (for guests) ───────────────────────────────────────
@@ -92,6 +168,9 @@ def get_user_preferences(uid: str | None) -> dict:
             # Merge with defaults so missing fields are always filled
             return {**DEFAULT_PREFERENCES, **prefs}
     except Exception as e:
+        if _is_firestore_unavailable(e):
+            local = _read_user_store(uid)
+            return {**DEFAULT_PREFERENCES, **(local.get("preferences") or {})}
         print(f"Could not fetch preferences for {uid}: {e}")
     return DEFAULT_PREFERENCES
 
@@ -259,7 +338,19 @@ async def analyze_food(
                 }
                 db.collection("users").document(uid).collection("food_history").document().set(history_entry)
             except Exception as e:
-                print(f"Could not save food history: {e}")
+                if _is_firestore_unavailable(e):
+                    local = _read_user_store(uid)
+                    history_entry = {
+                        "id": str(uuid4()),
+                        "detected_ingredients": ingredients,
+                        "recipes_generated": [r["name"] for r in recipe_data.get("recipes", [])],
+                        "analyzed_at": _now_iso(),
+                        "preferences_used": prefs,
+                    }
+                    local["food_history"] = [history_entry, *(local.get("food_history") or [])][:50]
+                    _write_user_store(uid, local)
+                else:
+                    print(f"Could not save food history: {e}")
 
         return recipe_data
 
@@ -275,16 +366,31 @@ async def analyze_food(
 
 @app.get("/api/profile")
 async def get_profile(uid: str = Depends(require_user)):
-    doc = db.collection("users").document(uid).get()
-    if not doc.exists:
-        return {"uid": uid, "profile": {}, "preferences": DEFAULT_PREFERENCES}
-    return doc.to_dict()
+    try:
+        doc = db.collection("users").document(uid).get()
+        if not doc.exists:
+            return {"uid": uid, "profile": {}, "preferences": DEFAULT_PREFERENCES}
+        return doc.to_dict()
+    except Exception as e:
+        if _is_firestore_unavailable(e):
+            local = _read_user_store(uid)
+            return {"uid": uid, "profile": local.get("profile", {}), "preferences": local.get("preferences", DEFAULT_PREFERENCES)}
+        raise
 
 
 @app.put("/api/profile")
 async def update_profile(data: dict, uid: str = Depends(require_user)):
-    db.collection("users").document(uid).set(data, merge=True)
-    return {"message": "Profile updated"}
+    try:
+        db.collection("users").document(uid).set(data, merge=True)
+        return {"message": "Profile updated"}
+    except Exception as e:
+        if _is_firestore_unavailable(e):
+            local = _read_user_store(uid)
+            incoming_profile = data.get("profile", {}) if isinstance(data, dict) else {}
+            local["profile"] = {**(local.get("profile") or {}), **incoming_profile}
+            _write_user_store(uid, local)
+            return {"message": "Profile updated"}
+        raise
 
 
 # ─── Preferences ─────────────────────────────────────────────────────────────
@@ -297,41 +403,81 @@ async def get_preferences(uid: str = Depends(require_user)):
 
 @app.put("/api/preferences")
 async def update_preferences(prefs: dict, uid: str = Depends(require_user)):
-    db.collection("users").document(uid).set({"preferences": prefs}, merge=True)
-    return {"message": "Preferences updated", "preferences": prefs}
+    try:
+        db.collection("users").document(uid).set({"preferences": prefs}, merge=True)
+        return {"message": "Preferences updated", "preferences": prefs}
+    except Exception as e:
+        if _is_firestore_unavailable(e):
+            local = _read_user_store(uid)
+            local["preferences"] = {**DEFAULT_PREFERENCES, **(prefs or {})}
+            _write_user_store(uid, local)
+            return {"message": "Preferences updated", "preferences": local["preferences"]}
+        raise
 
 
 # ─── Saved Recipes ───────────────────────────────────────────────────────────
 
 @app.get("/api/saved-recipes")
 async def get_saved_recipes(uid: str = Depends(require_user)):
-    recipes_ref = db.collection("users").document(uid).collection("saved_recipes")
-    docs = recipes_ref.order_by("saved_at", direction=firestore.Query.DESCENDING).stream()
-    return [{"id": doc.id, **doc.to_dict()} for doc in docs]
+    try:
+        recipes_ref = db.collection("users").document(uid).collection("saved_recipes")
+        docs = recipes_ref.order_by("saved_at", direction=firestore.Query.DESCENDING).stream()
+        return [{"id": doc.id, **doc.to_dict()} for doc in docs]
+    except Exception as e:
+        if _is_firestore_unavailable(e):
+            local = _read_user_store(uid)
+            return local.get("saved_recipes", [])
+        raise
 
 
 @app.post("/api/saved-recipes")
 async def save_recipe(recipe: dict, uid: str = Depends(require_user)):
-    from google.cloud.firestore import SERVER_TIMESTAMP
-    recipe["saved_at"] = SERVER_TIMESTAMP
-    ref = db.collection("users").document(uid).collection("saved_recipes").document()
-    ref.set(recipe)
-    return {"id": ref.id, "message": "Recipe saved"}
+    try:
+        from google.cloud.firestore import SERVER_TIMESTAMP
+        recipe["saved_at"] = SERVER_TIMESTAMP
+        ref = db.collection("users").document(uid).collection("saved_recipes").document()
+        ref.set(recipe)
+        return {"id": ref.id, "message": "Recipe saved"}
+    except Exception as e:
+        if _is_firestore_unavailable(e):
+            local = _read_user_store(uid)
+            saved_id = str(uuid4())
+            saved_recipe = {**recipe, "id": saved_id, "saved_at": _now_iso()}
+            local["saved_recipes"] = [saved_recipe, *(local.get("saved_recipes") or [])]
+            _write_user_store(uid, local)
+            return {"id": saved_id, "message": "Recipe saved"}
+        raise
 
 
 @app.delete("/api/saved-recipes/{recipe_id}")
 async def delete_saved_recipe(recipe_id: str, uid: str = Depends(require_user)):
-    db.collection("users").document(uid).collection("saved_recipes").document(recipe_id).delete()
-    return {"message": "Recipe deleted"}
+    try:
+        db.collection("users").document(uid).collection("saved_recipes").document(recipe_id).delete()
+        return {"message": "Recipe deleted"}
+    except Exception as e:
+        if _is_firestore_unavailable(e):
+            local = _read_user_store(uid)
+            local["saved_recipes"] = [
+                item for item in (local.get("saved_recipes") or []) if item.get("id") != recipe_id
+            ]
+            _write_user_store(uid, local)
+            return {"message": "Recipe deleted"}
+        raise
 
 
 # ─── Food History ────────────────────────────────────────────────────────────
 
 @app.get("/api/food-history")
 async def get_food_history(uid: str = Depends(require_user)):
-    history_ref = db.collection("users").document(uid).collection("food_history")
-    docs = history_ref.order_by("analyzed_at", direction=firestore.Query.DESCENDING).limit(50).stream()
-    return [{"id": doc.id, **doc.to_dict()} for doc in docs]
+    try:
+        history_ref = db.collection("users").document(uid).collection("food_history")
+        docs = history_ref.order_by("analyzed_at", direction=firestore.Query.DESCENDING).limit(50).stream()
+        return [{"id": doc.id, **doc.to_dict()} for doc in docs]
+    except Exception as e:
+        if _is_firestore_unavailable(e):
+            local = _read_user_store(uid)
+            return (local.get("food_history") or [])[:50]
+        raise
 
 
 # ─── Run ─────────────────────────────────────────────────────────────────────
