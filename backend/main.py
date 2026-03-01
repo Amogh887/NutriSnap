@@ -143,7 +143,7 @@ async def analyze_food(image: UploadFile = File(...)):
         
         # 3. Call the preview model using the exact preview string
         response = client.models.generate_content(
-            model='gemini-2.5-flash',
+            model='gemini-2.0-flash',
             contents=[image_part, prompt],
             config=types.GenerateContentConfig(
                 response_mime_type="application/json",
