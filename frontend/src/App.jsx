@@ -195,7 +195,7 @@ function App() {
             <span style={{ fontSize: '1.2rem' }}>⠿</span> Menu
           </button>
           <div style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', display: 'flex', alignItems: 'center' }}>
-            <img src="/logo.png" alt="NutriSnap" style={{ height: '36px', objectFit: 'contain' }} />
+            <img src="/logo.png" alt="NutriSnap" style={{ height: '95px', marginTop: '10px', objectFit: 'contain', pointerEvents: 'none' }} />
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
             {!user ? (
@@ -212,7 +212,7 @@ function App() {
                     onClick={() => setShowPreferences(true)}
                     title="Personalize"
                     style={{ 
-                      background: 'rgba(255, 255, 255, 0.1)', 
+                      background: '#000000', 
                       border: '1px solid rgba(255, 255, 255, 0.2)', 
                       color: '#FFFFFF', 
                       cursor: 'pointer', 
@@ -223,28 +223,28 @@ function App() {
                       alignItems: 'center', 
                       justifyContent: 'center', 
                       transition: 'all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)',
-                      boxShadow: '0 4px 12px rgba(10, 132, 255, 0.1)',
+                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.5)',
                       backdropFilter: 'blur(10px)',
                       WebkitBackdropFilter: 'blur(10px)'
                     }}
                     onMouseOver={(e) => { 
-                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)'; 
+                      e.currentTarget.style.background = '#111111'; 
                       e.currentTarget.style.transform = 'scale(1.05)'; 
-                      e.currentTarget.style.boxShadow = '0 6px 16px rgba(0, 0, 0, 0.4)';
+                      e.currentTarget.style.boxShadow = '0 6px 16px rgba(0, 0, 0, 0.7)';
                     }}
                     onMouseOut={(e) => { 
-                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'; 
+                      e.currentTarget.style.background = '#000000'; 
                       e.currentTarget.style.transform = 'scale(1)'; 
-                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.3)';
+                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.5)';
                     }}
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                       <line x1="4" y1="6" x2="20" y2="6"></line>
                       <line x1="4" y1="12" x2="20" y2="12"></line>
                       <line x1="4" y1="18" x2="20" y2="18"></line>
-                      <circle cx="8" cy="6" r="3" fill="#FFFFFF"></circle>
-                      <circle cx="16" cy="12" r="3" fill="#FFFFFF"></circle>
-                      <circle cx="12" cy="18" r="3" fill="#FFFFFF"></circle>
+                      <circle cx="8" cy="6" r="3" fill="#000000"></circle>
+                      <circle cx="16" cy="12" r="3" fill="#000000"></circle>
+                      <circle cx="12" cy="18" r="3" fill="#000000"></circle>
                     </svg>
                   </button>
                 </div>
