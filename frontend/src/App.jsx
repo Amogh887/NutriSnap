@@ -22,6 +22,7 @@ const getApiCandidates = (path) => {
   const cleanPath = path.replace(/^\/+/, '');
   return [
     `${baseUrl}/api/${cleanPath}`,
+    `${baseUrl}/api/index.py/${cleanPath}`,
     `${baseUrl}/${cleanPath}`,
   ];
 };
@@ -30,6 +31,7 @@ const requestApi = async ({ path, method = 'GET', headers = {}, body, signal }) 
   const urls = getApiCandidates(path);
   let response = null;
   let lastError = null;
+  let hit404 = false;
 
   for (const url of urls) {
     try {
@@ -43,9 +45,15 @@ const requestApi = async ({ path, method = 'GET', headers = {}, body, signal }) 
       if (response.status !== 404) {
         return response;
       }
+
+      hit404 = true;
     } catch (error) {
       lastError = error;
     }
+  }
+
+  if (hit404) {
+    throw new Error(`Server error: 404 (Tried: ${urls.join(' | ')})`);
   }
 
   if (response) {
